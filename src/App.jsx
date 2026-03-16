@@ -2915,7 +2915,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
       {/* Header */}
       <header className="g-head" style={{ borderBottom: `1px solid ${T.border}`, position: "sticky", top: 0, background: theme === "dark" ? "rgba(4,4,4,0.85)" : "rgba(246,245,240,0.85)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", zIndex: 100 }}>
         <div className="g-head-brand" onClick={() => { setPage("gen"); resetAll(); }} style={{ cursor: "pointer" }}>
-          <svg width="26" height="26" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" rx="18" fill="#1a1a2e"/><path d="M50 15L82 35V65L50 85L18 65V35L50 15Z" stroke="#4ecdc4" strokeWidth="3" fill="none"/><circle cx="35" cy="42" r="6" fill="#4ecdc4"/><circle cx="65" cy="42" r="6" fill="#ff6b6b"/><circle cx="50" cy="65" r="6" fill="#ffd93d"/><line x1="41" y1="42" x2="59" y2="42" stroke="#888" strokeWidth="2"/><line x1="37" y1="48" x2="48" y2="63" stroke="#888" strokeWidth="2"/><line x1="63" y1="48" x2="52" y2="63" stroke="#888" strokeWidth="2"/></svg>
+          <img src="/logo.png" alt="ComfyUI Studio" style={{ width: 28, height: 28, borderRadius: 6 }} />
           <span style={{ fontSize: 13, fontWeight: 700 }}>ComfyUI Studio</span>
         </div>
         <div className="g-head-right">
