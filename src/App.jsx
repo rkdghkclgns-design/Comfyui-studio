@@ -2298,6 +2298,36 @@ function CivitaiPreview({ img, fallbackStyle, size = 80, wide, label, base }) {
 const NCOL = { CheckpointLoaderSimple: "#2dd4a8", UNETLoader: "#60a5fa", DualCLIPLoader: "#a78bfa", VAELoader: "#f472b6", CLIPTextEncode: "#fbbf24", EmptyLatentImage: "#22d3ee", KSampler: "#f87171", VAEDecode: "#fb923c", VAEEncode: "#fb923c", SaveImage: "#4ade80", SaveAnimatedWEBP: "#4ade80", LoraLoader: "#e879f9", LoadImage: "#38bdf8", ControlNetLoader: "#94a3b8", ControlNetApplyAdvanced: "#94a3b8", UpscaleModelLoader: "#a3e635", ImageUpscaleWithModel: "#a3e635", SetLatentNoiseMask: "#22d3ee", ImageToMask: "#e2e8f0" };
 const LCOL = { MODEL: "#f87171", CLIP: "#a78bfa", VAE: "#f472b6", CONDITIONING: "#fbbf24", LATENT: "#22d3ee", IMAGE: "#4ade80", CONTROL_NET: "#94a3b8", MASK: "#e2e8f0", UPSCALE_MODEL: "#a3e635" };
 
+const NODE_PARAMS = {
+  CheckpointLoaderSimple: ["ckpt_name"],
+  UNETLoader: ["unet_name"],
+  DualCLIPLoader: ["clip_name1", "clip_name2"],
+  CLIPTextEncode: ["text"],
+  EmptyLatentImage: ["width", "height", "batch_size"],
+  KSampler: ["seed", "control_after_generate", "steps", "cfg", "sampler_name", "scheduler", "denoise"],
+  SaveImage: ["filename_prefix"],
+  SaveAnimatedWEBP: ["filename_prefix", "fps", "lossless", "quality", "method"],
+  LoraLoader: ["lora_name", "strength_model", "strength_clip"],
+  VAELoader: ["vae_name"],
+  ControlNetLoader: ["control_net_name"],
+  ImageUpscaleWithModel: [],
+  UpscaleModelLoader: ["model_name"],
+};
+
+function getNodeDisplayValues(node) {
+  const params = NODE_PARAMS[node.type];
+  if (!params || !node.widgets_values) return [];
+  const result = [];
+  params.forEach((name, idx) => {
+    if (idx < node.widgets_values.length && node.widgets_values[idx] != null) {
+      const val = node.widgets_values[idx];
+      const display = typeof val === "string" && val.length > 28 ? val.slice(0, 28) + "…" : val;
+      result.push({ name, value: display });
+    }
+  });
+  return result;
+}
+
 function NodeGraph({ workflow: wf, theme }) {
   const [pan, setPan] = useState({ x: 40, y: 10 }); const [zoom, setZoom] = useState(0.38); const [drag, setDrag] = useState(false); const ref = useRef({ x: 0, y: 0 });
   if (!wf?.nodes?.length) return null;
@@ -2316,10 +2346,15 @@ function NodeGraph({ workflow: wf, theme }) {
         <svg style={{ position: "absolute", width: 2400, height: 1400, pointerEvents: "none", overflow: "visible" }}>
           {wf.links.map((link, i) => { const [, si, ss, di, ds, tp] = link; const sn = wf.nodes.find(n => n.id === si), dn = wf.nodes.find(n => n.id === di); if (!sn || !dn) return null; const sx = sn.pos[0] - mx + 310, sy = sn.pos[1] - my + 42 + ss * 24, dx = dn.pos[0] - mx + 10, dy = dn.pos[1] - my + 42 + ds * 24; return <path key={i} d={`M${sx} ${sy}C${(sx + dx) / 2} ${sy},${(sx + dx) / 2} ${dy},${dx} ${dy}`} stroke={LCOL[tp] || "#333"} strokeWidth={2} fill="none" opacity={0.5} />; })}
         </svg>
-        {wf.nodes.map(node => { const c = NCOL[node.type] || "#555"; return (
+        {wf.nodes.map(node => { const c = NCOL[node.type] || "#555"; const vals = getNodeDisplayValues(node); const nodeH = 42 + Math.max(vals.length * 16, 0); return (
           <div key={node.id} style={{ position: "absolute", left: node.pos[0] - mx, top: node.pos[1] - my, width: 290, background: `${c}0a`, border: `1.5px solid ${c}55`, borderRadius: 8, fontSize: 10 }}>
             <div style={{ padding: "6px 10px", borderBottom: `1px solid ${c}22`, fontWeight: 700, fontSize: 10, color: c, fontFamily: "'JetBrains Mono',monospace" }}>{node.title}</div>
-            <div style={{ padding: "3px 10px 5px", fontSize: 8, color: T.text4, fontFamily: "monospace" }}>{node.type}</div>
+            <div style={{ padding: "3px 10px 2px", fontSize: 8, color: T.text4, fontFamily: "monospace" }}>{node.type}</div>
+            {vals.length > 0 && <div style={{ padding: "2px 10px 6px" }}>
+              {vals.map((v, vi) => <div key={vi} style={{ fontSize: 8, fontFamily: "monospace", color: T.text3 || "#999", lineHeight: 1.6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <span style={{ color: T.text4 || "#666" }}>{v.name}:</span> {String(v.value)}
+              </div>)}
+            </div>}
             {node.inputs?.map((_, idx) => <div key={`i${idx}`} style={{ position: "absolute", left: -4, top: 34 + idx * 24, width: 8, height: 8, borderRadius: "50%", background: c, border: `2px solid ${T.bg}` }} />)}
             {node.outputs?.map((_, idx) => <div key={`o${idx}`} style={{ position: "absolute", right: -4, top: 34 + idx * 24, width: 8, height: 8, borderRadius: "50%", background: c, border: `2px solid ${T.bg}` }} />)}
           </div>); })}
@@ -2661,10 +2696,6 @@ export default function App() {
     const issues = validateWF(wf, lang);
     setValidation(issues);
     setWorkflow(wf);
-    const entry = { id: Date.now(), cat, nodeCount: wf.nodes.length, date: new Date().toLocaleDateString(), model: finalConfig.model, sampler: finalConfig.sampler };
-    const newHistory = [entry, ...wfHistory].slice(0, 20);
-    setWfHistory(newHistory);
-    store.set("wf:history", newHistory);
     setStep(2);
   };
   doGenerateRef.current = doGenerate;
@@ -3114,16 +3145,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
                 )}
               </div>
             )}
-            {/* Workflow History (#10) */}
-            {wfHistory.length > 0 && <div style={{ marginTop: 28 }}>
-              <h3 style={{ fontSize: 13, fontWeight: 600, color: T.text3, marginBottom: 10 }}>{t("historyTitle")}</h3>
-              <div style={{ display: "flex", gap: 6, overflowX: "auto" }}>
-                {wfHistory.slice(0, 5).map(h => <div key={h.id} style={{ padding: "8px 12px", background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 10, color: T.text2, minWidth: 120, flexShrink: 0 }}>
-                  <div style={{ fontWeight: 600 }}>{CATS.find(c => c.id === h.cat)?.label || h.cat}</div>
-                  <div style={{ color: T.text4, marginTop: 2 }}>{h.nodeCount}{t("nodes")} · {h.date}</div>
-                </div>)}
-              </div>
-            </div>}
+            {/* Workflow History - hidden */}
           </div>)}
 
           {step === 1 && (<div style={{ animation: "fi .35s ease" }}>
@@ -3244,9 +3266,9 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
               <div><h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 2, fontFamily: SERIF, letterSpacing: "-0.02em" }}>{t("resultTitle")}</h2><p style={{ color: T.text4, fontSize: 11 }}>{workflow.nodes.length} {t("nodes")} · {workflow.links.length} {t("impConn")} · {t("pbApplied")}</p></div>
               <div style={{ display: "flex", gap: 5 }}>
-                <button className="bs" onClick={() => { showExport(JSON.stringify(resultTab === "api" ? toAPIFormat(workflow) : workflow, null, 2), "workflow.json"); }}>{t("resultCopy")}</button>
+                <button className="bs" onClick={() => { const json = JSON.stringify(resultTab === "api" ? toAPIFormat(workflow) : workflow, null, 2); const blob = new Blob([json], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "workflow.json"; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }}>{t("resultCopy")}</button>
                 <button className="bs" onClick={async () => { const id = await shareWorkflow(workflow); if (id) { setShareId(id); showExport(window.location.origin + window.location.pathname + "?wf=" + id, "share_url.txt"); } }}>📤 {shareId ? t("rsLinked") : t("rsShare")}</button>
-                <button className="bp" onClick={() => { const data = resultTab === "api" ? toAPIFormat(workflow) : workflow; showExport(JSON.stringify(data, null, 2), `comfyui_${cat}.json`); }}>{t("resultDownload")}</button>
+                <button className="bp" onClick={() => { const data = resultTab === "api" ? toAPIFormat(workflow) : workflow; const json = JSON.stringify(data, null, 2); const blob = new Blob([json], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `comfyui_${cat}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }}>{t("resultDownload")}</button>
               </div>
             </div>
             {/* Applied settings summary */}
