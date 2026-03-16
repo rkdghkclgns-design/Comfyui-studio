@@ -44,7 +44,7 @@ function randomSeed() { return Math.floor(Math.random() * 2147483647); }
 // THEME SYSTEM (#12)
 // ═══════════════════════════════════════════
 const THEMES = {
-  dark: { bg: "#040404", bg2: "#0a0a09", bg3: "#0e0e0c", bg4: "#141412", border: "rgba(255,255,255,0.06)", border2: "rgba(255,255,255,0.1)", text: "#e8e4dc", text2: "#9a9689", text3: "#6b6760", text4: "#3d3a36", accent: "#9caf7c", accent2: "#7a9458", glow: "rgba(156,175,124,0.08)" },
+  dark: { bg: "#040404", bg2: "#0a0a09", bg3: "#0e0e0c", bg4: "#141412", border: "rgba(255,255,255,0.06)", border2: "rgba(255,255,255,0.1)", text: "#e8e4dc", text2: "#9a9689", text3: "#a09a90", text4: "#7a756c", accent: "#9caf7c", accent2: "#7a9458", glow: "rgba(156,175,124,0.08)" },
   light: { bg: "#f6f5f0", bg2: "#ffffff", bg3: "#efede6", bg4: "#e5e3da", border: "rgba(0,0,0,0.08)", border2: "rgba(0,0,0,0.14)", text: "#1a1918", text2: "#5a5850", text3: "#8a877e", text4: "#b5b1a8", accent: "#6d8a4e", accent2: "#557438", glow: "rgba(109,138,78,0.06)" },
 };
 
@@ -59,7 +59,7 @@ const LANG = {
     // Modes
     modeManual: "수동", modeAI: "AI 자동", modePrompt: "🎨 프롬프트", modeDebug: "🔍 디버거", modeImprove: "🔧 개선",
     // Generator
-    genTitle: "워크플로우 생성", genDesc: "목적을 선택하거나 AI에게 설명하세요",
+    genTitle: "워크플로우 생성", genDesc: "간편하게 ComfyUI 워크플로우를 만들어보세요.",
     genReady: "바로 사용 가능한 워크플로우 생성 →", genModelRequired: "⚠ 모델 파일명을 먼저 입력하세요",
     genBack: "← 뒤로", genNew: "새 워크플로우",
     // Categories
@@ -235,7 +235,7 @@ const LANG = {
   en: {
     navWorkflow: "Workflow", navModels: "Models", navNodes: "Nodes", navTutorials: "Tutorials", navInstall: "Install",
     modeManual: "Manual", modeAI: "AI Auto", modePrompt: "🎨 Prompt", modeDebug: "🔍 Debug", modeImprove: "🔧 Improve",
-    genTitle: "Generate Workflow", genDesc: "Choose a category or describe to AI",
+    genTitle: "Generate Workflow", genDesc: "Easily create ComfyUI workflows.",
     genReady: "Generate Ready-to-Use Workflow →", genModelRequired: "⚠ Enter model filename first",
     genBack: "← Back", genNew: "New Workflow",
     catT2I: "Text → Image", catI2I: "Image → Image", catInpaint: "Inpainting", catUpscale: "Upscale",
@@ -374,7 +374,7 @@ const LANG = {
   zh: {
     navWorkflow: "工作流", navModels: "模型", navNodes: "节点", navTutorials: "教程", navInstall: "安装",
     modeManual: "手动", modeAI: "AI 自动", modePrompt: "🎨 提示词", modeDebug: "🔍 调试", modeImprove: "🔧 优化",
-    genTitle: "生成工作流", genDesc: "选择类型或向AI描述需求",
+    genTitle: "生成工作流", genDesc: "轻松创建ComfyUI工作流。",
     genReady: "生成可直接使用的工作流 →", genModelRequired: "⚠ 请先输入模型文件名",
     genBack: "← 返回", genNew: "新工作流",
     catT2I: "文生图", catI2I: "图生图", catInpaint: "局部重绘", catUpscale: "超分辨率",
@@ -513,7 +513,7 @@ const LANG = {
   ja: {
     navWorkflow: "ワークフロー", navModels: "モデル", navNodes: "ノード", navTutorials: "チュートリアル", navInstall: "インストール",
     modeManual: "手動", modeAI: "AI 自動", modePrompt: "🎨 プロンプト", modeDebug: "🔍 デバッグ", modeImprove: "🔧 改善",
-    genTitle: "ワークフロー生成", genDesc: "カテゴリを選択するかAIに説明してください",
+    genTitle: "ワークフロー生成", genDesc: "簡単にComfyUIワークフローを作成しましょう。",
     genReady: "すぐ使えるワークフローを生成 →", genModelRequired: "⚠ モデルファイル名を先に入力してください",
     genBack: "← 戻る", genNew: "新しいワークフロー",
     catT2I: "テキスト→画像", catI2I: "画像→画像", catInpaint: "インペイント", catUpscale: "アップスケール",
@@ -2467,10 +2467,7 @@ function SlideViewer({ tutorial, onClose, theme, progress, onProgress, lang }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontSize: 18 }}>{tutorial.icon}</span><span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{tutorial.title}</span></div>
         <button onClick={onClose} style={{ background: "transparent", border: `1px solid ${T.border2}`, borderRadius: 6, padding: "4px 12px", color: T.text3, cursor: "pointer", fontSize: 10 }}>{t("tutClose")}</button>
       </div>
-      {/* Progress */}
-      <div style={{ padding: "0 20px", marginTop: 10, display: "flex", gap: 3 }}>
-        {tutorial.slides.map((_, i) => <div key={i} onClick={() => setSlideIdx(i)} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= slideIdx ? T.text : T.border, cursor: "pointer", transition: "background .3s" }} />)}
-      </div>
+      {/* Progress - hidden */}
       <div style={{ padding: "16px 20px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: T.text }}>{slide.title}</h3>
@@ -2835,7 +2832,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
 .g-head-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .g-head-brand{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .g-config{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.g-cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.g-cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;max-width:720px;margin:0 auto}
 .g-tuts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .g-spec{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .g-res{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px}
@@ -2871,8 +2868,8 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
 
       {/* Header */}
       <header className="g-head" style={{ borderBottom: `1px solid ${T.border}`, position: "sticky", top: 0, background: theme === "dark" ? "rgba(4,4,4,0.85)" : "rgba(246,245,240,0.85)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", zIndex: 100 }}>
-        <div className="g-head-brand">
-          <div style={{ width: 26, height: 26, borderRadius: 6, background: T.bg4, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, border: `1px solid ${T.border2}` }}>⬡</div>
+        <div className="g-head-brand" onClick={() => { setPage("gen"); resetAll(); }} style={{ cursor: "pointer" }}>
+          <svg width="26" height="26" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" rx="18" fill="#1a1a2e"/><path d="M50 15L82 35V65L50 85L18 65V35L50 15Z" stroke="#4ecdc4" strokeWidth="3" fill="none"/><circle cx="35" cy="42" r="6" fill="#4ecdc4"/><circle cx="65" cy="42" r="6" fill="#ff6b6b"/><circle cx="50" cy="65" r="6" fill="#ffd93d"/><line x1="41" y1="42" x2="59" y2="42" stroke="#888" strokeWidth="2"/><line x1="37" y1="48" x2="48" y2="63" stroke="#888" strokeWidth="2"/><line x1="63" y1="48" x2="52" y2="63" stroke="#888" strokeWidth="2"/></svg>
           <span style={{ fontSize: 13, fontWeight: 700 }}>ComfyUI Studio</span>
         </div>
         <div className="g-head-right">
@@ -2924,7 +2921,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
             {aiMode === "manual" && (
               <div className="g-cats">
                 {CATS.map((c, i) => <button key={c.id} className="hov" onClick={() => selectCategory(c.id)} style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px 12px", textAlign: "left", cursor: "pointer", transition: "all .2s", animation: `fi .3s ease ${i * .03}s both` }}>
-                  <div style={{ fontSize: 18, marginBottom: 4 }}>{c.icon}</div>
+                  <div style={{ fontSize: 18, marginBottom: 4, color: "#fff" }}>{c.icon}</div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: T.text }}>{c.label}</div>
                 </button>)}
               </div>
