@@ -45,7 +45,7 @@ function randomSeed() { return Math.floor(Math.random() * 2147483647); }
 // ═══════════════════════════════════════════
 const THEMES = {
   dark: { bg: "#040404", bg2: "#0a0a09", bg3: "#0e0e0c", bg4: "#141412", border: "rgba(255,255,255,0.06)", border2: "rgba(255,255,255,0.1)", text: "#e8e4dc", text2: "#9a9689", text3: "#a09a90", text4: "#7a756c", accent: "#9caf7c", accent2: "#7a9458", glow: "rgba(156,175,124,0.08)" },
-  light: { bg: "#f6f5f0", bg2: "#ffffff", bg3: "#efede6", bg4: "#e5e3da", border: "rgba(0,0,0,0.08)", border2: "rgba(0,0,0,0.14)", text: "#1a1918", text2: "#5a5850", text3: "#8a877e", text4: "#b5b1a8", accent: "#6d8a4e", accent2: "#557438", glow: "rgba(109,138,78,0.06)" },
+  light: { bg: "#f6f5f0", bg2: "#ffffff", bg3: "#efede6", bg4: "#e5e3da", border: "rgba(0,0,0,0.15)", border2: "rgba(0,0,0,0.22)", text: "#1a1918", text2: "#3d3a34", text3: "#5a5750", text4: "#7a7670", accent: "#4a7a2e", accent2: "#3d6420", glow: "rgba(74,122,46,0.08)" },
 };
 
 
@@ -724,45 +724,45 @@ const CVM = {
   t2i: {
     realistic: [
       { name: "RealVisXL V5.0", id: "139562", base: "SDXL", vram: 8, desc: "초현실적 인물/풍경 — 피부 텍스처, 조명, 자연스러운 표정이 뛰어남", rating: 4.9, dl: "2.1M", sampler: "dpmpp_2m_sde", scheduler: "karras", steps: 28, cfg: 4.5, style: "linear-gradient(135deg,#2a1a0a,#4a2a1a,#1a2a3a)", sampleDesc: "실사 인물, 풍경, 제품 사진", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/aeba5afe-8bde-41d2-9150-8eea2eeda9a4/width=450/aeba5afe-8bde-41d2-9150-8eea2eeda9a4.jpeg" },
-      { name: "Jib Mix Flux v12", id: "686814", base: "Flux", vram: 12, desc: "Flux 기반 최고 실사 체크포인트 — 해부학 정확도, 자연스러운 피부", rating: 4.8, dl: "1.5M", sampler: "dpmpp_2m", scheduler: "sgm_uniform", steps: 25, cfg: 3.5, style: "linear-gradient(135deg,#1a1a2a,#2a3a4a,#0a1a2a)", sampleDesc: "포트레이트, 전신, 패션" },
+      { name: "Jib Mix Flux v12", id: "686814", base: "Flux", vram: 12, desc: "Flux 기반 최고 실사 체크포인트 — 해부학 정확도, 자연스러운 피부", rating: 4.8, dl: "1.5M", sampler: "dpmpp_2m", scheduler: "sgm_uniform", steps: 25, cfg: 3.5, style: "linear-gradient(135deg,#1a1a2a,#2a3a4a,#0a1a2a)", sampleDesc: "포트레이트, 전신, 패션", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/3e1a4255-1c01-4781-99bc-b9454cbf7dd4/original=true/106313102.jpeg" },
     ],
     anime: [
-      { name: "AAM XL AnimeMix", id: "248024", base: "SDXL", vram: 8, desc: "SDXL 최고 애니메이션 — 선명한 선화, 생동감 있는 컬러", rating: 4.9, dl: "1.8M", sampler: "euler_ancestral", scheduler: "normal", steps: 25, cfg: 7, style: "linear-gradient(135deg,#1a0a2a,#3a1a4a,#0a2a3a)", sampleDesc: "애니 캐릭터, 일러스트" },
-      { name: "Pony Diffusion V6", id: "257749", base: "SDXL", vram: 8, desc: "다재다능 애니/일러스트 — 다양한 화풍 소화 가능", rating: 4.7, dl: "2.3M", sampler: "euler_ancestral", scheduler: "normal", steps: 28, cfg: 7, style: "linear-gradient(135deg,#2a1a3a,#4a2a4a,#1a1a2a)", sampleDesc: "만화, 일러스트, 팬아트" },
+      { name: "AAM XL AnimeMix", id: "248024", base: "SDXL", vram: 8, desc: "SDXL 최고 애니메이션 — 선명한 선화, 생동감 있는 컬러", rating: 4.9, dl: "1.8M", sampler: "euler_ancestral", scheduler: "normal", steps: 25, cfg: 7, style: "linear-gradient(135deg,#1a0a2a,#3a1a4a,#0a2a3a)", sampleDesc: "애니 캐릭터, 일러스트", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/50447032-1af6-4492-89c0-9c19cd69da43/original=true/5626297.jpeg" },
+      { name: "Pony Diffusion V6", id: "257749", base: "SDXL", vram: 8, desc: "다재다능 애니/일러스트 — 다양한 화풍 소화 가능", rating: 4.7, dl: "2.3M", sampler: "euler_ancestral", scheduler: "normal", steps: 28, cfg: 7, style: "linear-gradient(135deg,#2a1a3a,#4a2a4a,#1a1a2a)", sampleDesc: "만화, 일러스트, 팬아트", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/4790674c-e16d-4dc7-b384-af4381fcfa3f/original=true/5706937.jpeg" },
     ],
     artistic: [
       { name: "Juggernaut XL v9", id: "133005", base: "SDXL", vram: 8, desc: "만능형 고품질 — 실사+일러스트+개념 아트 모두 가능", rating: 4.9, dl: "3.2M", sampler: "dpmpp_2m_sde", scheduler: "karras", steps: 30, cfg: 4.5, style: "linear-gradient(135deg,#0a1a1a,#1a3a2a,#2a1a1a)", sampleDesc: "풍경, 판타지, 개념 아트", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/7b7b5c59-e975-4a3d-babe-b29aa577d237/width=450/7b7b5c59-e975-4a3d-babe-b29aa577d237.jpeg" },
     ],
   },
   t2v: { recommended: [
-    { name: "Wan 2.2 T2V", id: "wan22", base: "Wan", vram: 16, desc: "최신 오픈소스 T2V — 프롬프트 충실도와 시간적 일관성 우수", rating: 4.8, dl: "520K", sampler: "euler", scheduler: "normal", steps: 30, cfg: 6, style: "linear-gradient(135deg,#0a0a1a,#1a1a3a,#0a2a2a)", sampleDesc: "3-10초 비디오 클립" },
-    { name: "LTX-Video 2.3", id: "ltx", base: "LTX", vram: 12, desc: "NVIDIA 최적화 빠른 비디오 — RTX 50에서 NVFP4 지원", rating: 4.6, dl: "380K", sampler: "euler", scheduler: "normal", steps: 25, cfg: 5, style: "linear-gradient(135deg,#1a1a0a,#2a2a1a,#1a1a2a)", sampleDesc: "빠른 비디오 생성" },
+    { name: "Wan 2.2 T2V", id: "wan22", base: "Wan", vram: 16, desc: "최신 오픈소스 T2V — 프롬프트 충실도와 시간적 일관성 우수", rating: 4.8, dl: "520K", sampler: "euler", scheduler: "normal", steps: 30, cfg: 6, style: "linear-gradient(135deg,#0a0a1a,#1a1a3a,#0a2a2a)", sampleDesc: "3-10초 비디오 클립", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/9fd7e6dd-f91f-44b8-b2b2-12a1dbf30515/original=true/72289903.jpeg" },
+    { name: "LTX-Video 2.3", id: "ltx", base: "LTX", vram: 12, desc: "NVIDIA 최적화 빠른 비디오 — RTX 50에서 NVFP4 지원", rating: 4.6, dl: "380K", sampler: "euler", scheduler: "normal", steps: 25, cfg: 5, style: "linear-gradient(135deg,#1a1a0a,#2a2a1a,#1a1a2a)", sampleDesc: "빠른 비디오 생성", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/9a000f2f-bc8d-4338-9e44-34edb5a5bb6b/original=true/61909869.jpeg" },
   ] },
   i2v: { recommended: [
-    { name: "HunyuanVideo I2V", id: "hunyuan", base: "Hunyuan", vram: 24, desc: "13B 파라미터 — 정지 이미지를 고품질 비디오로 변환", rating: 4.9, dl: "290K", sampler: "euler", scheduler: "normal", steps: 30, cfg: 6, style: "linear-gradient(135deg,#1a0a1a,#3a1a2a,#1a0a2a)", sampleDesc: "이미지→비디오 변환" },
+    { name: "HunyuanVideo I2V", id: "hunyuan", base: "Hunyuan", vram: 24, desc: "13B 파라미터 — 정지 이미지를 고품질 비디오로 변환", rating: 4.9, dl: "290K", sampler: "euler", scheduler: "normal", steps: 30, cfg: 6, style: "linear-gradient(135deg,#1a0a1a,#3a1a2a,#1a0a2a)", sampleDesc: "이미지→비디오 변환", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/9fd7e6dd-f91f-44b8-b2b2-12a1dbf30515/original=true/72289903.jpeg" },
   ] },
   i2i: { recommended: [{ name: "RealVisXL V5.0", id: "139562", base: "SDXL", vram: 8, desc: "스타일 변환 최적 — denoise 조절로 변환 강도 제어", rating: 4.9, dl: "2.1M", sampler: "dpmpp_2m_sde", scheduler: "karras", steps: 20, cfg: 4.5, style: "linear-gradient(135deg,#2a1a0a,#4a2a1a,#1a2a3a)", sampleDesc: "스타일 변환, 이미지 개선", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/aeba5afe-8bde-41d2-9150-8eea2eeda9a4/width=450/aeba5afe-8bde-41d2-9150-8eea2eeda9a4.jpeg" }] },
-  controlnet: { recommended: [{ name: "FLUX.1 CN Canny", id: "flux-cn", base: "Flux", vram: 12, desc: "Flux 전용 엣지 감지 ControlNet — 형태 유지하며 스타일 변환", rating: 4.7, dl: "680K", sampler: "euler", scheduler: "normal", steps: 25, cfg: 3.5, style: "linear-gradient(135deg,#0a1a0a,#1a2a1a,#0a1a2a)", sampleDesc: "엣지 기반 생성" }] },
+  controlnet: { recommended: [{ name: "FLUX.1 CN Canny", id: "flux-cn", base: "Flux", vram: 12, desc: "Flux 전용 엣지 감지 ControlNet — 형태 유지하며 스타일 변환", rating: 4.7, dl: "680K", sampler: "euler", scheduler: "normal", steps: 25, cfg: 3.5, style: "linear-gradient(135deg,#0a1a0a,#1a2a1a,#0a1a2a)", sampleDesc: "엣지 기반 생성", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/77c8a3fe-09b4-48ac-9c4f-d0385e2633c8/original=true/41335598.jpeg" }] },
   lora: {
     detail: [
       { name: "Detail Tweaker XL", id: "122359", base: "SDXL", vram: 0, desc: "디테일 강도 조절 — 양수=세밀함↑, 음수=부드러움↑. 가장 인기 있는 유틸 LoRA", rating: 4.9, dl: "4.2M", sampler: "N/A", scheduler: "N/A", steps: 0, cfg: 0, strength: "0.5~1.5", trigger: "없음", style: "linear-gradient(135deg,#1a2a1a,#2a3a2a,#1a3a1a)", sampleDesc: "디테일 강화/완화", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/a5a1f21c-03d2-4dfe-bf22-5765f4aeceee/width=450/a5a1f21c-03d2-4dfe-bf22-5765f4aeceee.jpeg" },
       { name: "FaeTastic Details", id: "134338", base: "SDXL", vram: 0, desc: "마법같은 디테일+채도 강화 — 판타지/일러스트에 특히 효과적", rating: 4.8, dl: "320K", sampler: "N/A", scheduler: "N/A", steps: 0, cfg: 0, strength: "0.6~0.8", trigger: "faetastic", style: "linear-gradient(135deg,#2a1a3a,#3a2a4a,#1a2a3a)", sampleDesc: "판타지 디테일 강화", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/88c88742-1c02-4c56-8a23-e7ef24eb3e1b/width=450/88c88742-1c02-4c56-8a23-e7ef24eb3e1b.jpeg" },
     ],
     style: [
-      { name: "Pixel Art XL", id: "120096", base: "SDXL", vram: 0, desc: "픽셀아트 스타일 변환 — 레트로 게임 그래픽 느낌", rating: 4.8, dl: "580K", sampler: "N/A", scheduler: "N/A", steps: 0, cfg: 0, strength: "0.7~1.0", trigger: "pixel art", style: "linear-gradient(135deg,#0a2a1a,#1a4a2a,#0a3a1a)", sampleDesc: "픽셀아트 스타일" },
-      { name: "Vintage Magazine", id: "141048", base: "SDXL", vram: 0, desc: "빈티지 잡지/포스터 스타일 — 레트로 광고 느낌", rating: 4.7, dl: "210K", sampler: "N/A", scheduler: "N/A", steps: 0, cfg: 0, strength: "0.6~0.9", trigger: "VintageMagStyle", style: "linear-gradient(135deg,#3a2a0a,#4a3a1a,#2a2a0a)", sampleDesc: "빈티지 포스터" },
-      { name: "DreamyVibes Artstyle", id: "129988", base: "SDXL", vram: 0, desc: "몽환적 일러스트 스타일 — 부드러운 색감과 분위기", rating: 4.7, dl: "195K", sampler: "N/A", scheduler: "N/A", steps: 0, cfg: 0, strength: "0.6~0.8", trigger: "dreamyvibes artstyle", style: "linear-gradient(135deg,#2a1a2a,#3a2a3a,#2a1a3a)", sampleDesc: "몽환적 일러스트" },
+      { name: "Pixel Art XL", id: "120096", base: "SDXL", vram: 0, desc: "픽셀아트 스타일 변환 — 레트로 게임 그래픽 느낌", rating: 4.8, dl: "580K", sampler: "N/A", scheduler: "N/A", steps: 0, cfg: 0, strength: "0.7~1.0", trigger: "pixel art", style: "linear-gradient(135deg,#0a2a1a,#1a4a2a,#0a3a1a)", sampleDesc: "픽셀아트 스타일", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/0770e5fc-4260-4e3c-a0ee-bf2253028e9f/original=true/1918193.jpeg" },
+      { name: "Vintage Magazine", id: "141048", base: "SDXL", vram: 0, desc: "빈티지 잡지/포스터 스타일 — 레트로 광고 느낌", rating: 4.7, dl: "210K", sampler: "N/A", scheduler: "N/A", steps: 0, cfg: 0, strength: "0.6~0.9", trigger: "VintageMagStyle", style: "linear-gradient(135deg,#3a2a0a,#4a3a1a,#2a2a0a)", sampleDesc: "빈티지 포스터", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/810f120d-d19d-49aa-9810-9d43a3b15a27/original=true/2379098.jpeg" },
+      { name: "DreamyVibes Artstyle", id: "129988", base: "SDXL", vram: 0, desc: "몽환적 일러스트 스타일 — 부드러운 색감과 분위기", rating: 4.7, dl: "195K", sampler: "N/A", scheduler: "N/A", steps: 0, cfg: 0, strength: "0.6~0.8", trigger: "dreamyvibes artstyle", style: "linear-gradient(135deg,#2a1a2a,#3a2a3a,#2a1a3a)", sampleDesc: "몽환적 일러스트", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/eceec0cf-c814-464f-aaea-fef00a727f51/original=true/5196439.jpeg" },
     ],
     realism: [
-      { name: "Add More Details", id: "82098", base: "SDXL", vram: 0, desc: "실사 디테일 극대화 — 피부/질감/배경 미세 디테일 강화", rating: 4.8, dl: "1.8M", sampler: "N/A", scheduler: "N/A", steps: 0, cfg: 0, strength: "0.5~1.0", trigger: "없음", style: "linear-gradient(135deg,#2a1a0a,#3a2a1a,#2a2a1a)", sampleDesc: "실사 디테일 강화" },
-      { name: "FilmGrain", id: "173531", base: "SDXL", vram: 0, desc: "필름 그레인+시네마틱 톤 — 아날로그 카메라 느낌 부여", rating: 4.7, dl: "420K", sampler: "N/A", scheduler: "N/A", steps: 0, cfg: 0, strength: "0.4~0.8", trigger: "film grain", style: "linear-gradient(135deg,#1a1a0a,#2a2a1a,#1a1a0a)", sampleDesc: "필름 그레인 효과" },
+      { name: "Add More Details", id: "82098", base: "SDXL", vram: 0, desc: "실사 디테일 극대화 — 피부/질감/배경 미세 디테일 강화", rating: 4.8, dl: "1.8M", sampler: "N/A", scheduler: "N/A", steps: 0, cfg: 0, strength: "0.5~1.0", trigger: "없음", style: "linear-gradient(135deg,#2a1a0a,#3a2a1a,#2a2a1a)", sampleDesc: "실사 디테일 강화", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/c1697174-7c8d-4bde-b053-7b1ec0692b64/original=true/995787.jpeg" },
+      { name: "FilmGrain", id: "173531", base: "SDXL", vram: 0, desc: "필름 그레인+시네마틱 톤 — 아날로그 카메라 느낌 부여", rating: 4.7, dl: "420K", sampler: "N/A", scheduler: "N/A", steps: 0, cfg: 0, strength: "0.4~0.8", trigger: "film grain", style: "linear-gradient(135deg,#1a1a0a,#2a2a1a,#1a1a0a)", sampleDesc: "필름 그레인 효과", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/5ef5ed30-feca-46e4-b6b4-6b41ef2ed9f7/original=true/2424581.jpeg" },
     ],
     speed: [
-      { name: "LCM LoRA SDXL", id: "195519", base: "SDXL", vram: 0, desc: "4-8 steps만으로 빠른 생성 — 프로토타이핑에 최적", rating: 4.6, dl: "890K", sampler: "lcm", scheduler: "normal", steps: 6, cfg: 1.5, strength: "1.0", trigger: "없음", style: "linear-gradient(135deg,#0a1a2a,#1a2a3a,#0a2a2a)", sampleDesc: "초고속 생성" },
-      { name: "Hyper-SDXL 8step", id: "261973", base: "SDXL", vram: 0, desc: "8 steps에 최적화 — LCM보다 품질↑, CFG 5 사용", rating: 4.7, dl: "620K", sampler: "dpmpp_2m_sde", scheduler: "karras", steps: 8, cfg: 5, strength: "1.0", trigger: "없음", style: "linear-gradient(135deg,#1a0a2a,#2a1a3a,#1a1a2a)", sampleDesc: "고속 고품질 생성" },
+      { name: "LCM LoRA SDXL", id: "195519", base: "SDXL", vram: 0, desc: "4-8 steps만으로 빠른 생성 — 프로토타이핑에 최적", rating: 4.6, dl: "890K", sampler: "lcm", scheduler: "normal", steps: 6, cfg: 1.5, strength: "1.0", trigger: "없음", style: "linear-gradient(135deg,#0a1a2a,#1a2a3a,#0a2a2a)", sampleDesc: "초고속 생성", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/e333ea36-cf4f-4124-a8a9-1a44f0824382/original=true/9026062.jpeg" },
+      { name: "Hyper-SDXL 8step", id: "261973", base: "SDXL", vram: 0, desc: "8 steps에 최적화 — LCM보다 품질↑, CFG 5 사용", rating: 4.7, dl: "620K", sampler: "dpmpp_2m_sde", scheduler: "karras", steps: 8, cfg: 5, strength: "1.0", trigger: "없음", style: "linear-gradient(135deg,#1a0a2a,#2a1a3a,#1a1a2a)", sampleDesc: "고속 고품질 생성", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/987fbbce-2b17-47d3-befa-f85bc4a0a477/original=true/11187972.jpeg" },
     ],
   },
-  upscale: { recommended: [{ name: "4x-UltraSharp", id: "up1", base: "Upscaler", vram: 4, desc: "가장 인기 있는 4x 업스케일러 — 선명하고 디테일 보존", rating: 4.9, dl: "5M+", sampler: "N/A", scheduler: "N/A", steps: 0, cfg: 0, style: "linear-gradient(135deg,#0a1a0a,#1a3a1a,#0a2a0a)", sampleDesc: "4배 업스케일" }] },
+  upscale: { recommended: [{ name: "4x-UltraSharp", id: "up1", base: "Upscaler", vram: 4, desc: "가장 인기 있는 4x 업스케일러 — 선명하고 디테일 보존", rating: 4.9, dl: "5M+", sampler: "N/A", scheduler: "N/A", steps: 0, cfg: 0, style: "linear-gradient(135deg,#0a1a0a,#1a3a1a,#0a2a0a)", sampleDesc: "4배 업스케일", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/d4d08e88-ac22-4cd7-9e64-d292ef522357/original=true/1720944.jpeg" }] },
   inpaint: { recommended: [{ name: "RealVisXL Inpaint", id: "139562", base: "SDXL", vram: 8, desc: "자연스러운 인페인팅 — 경계선 없이 매끄러운 수정", rating: 4.8, dl: "1.2M", sampler: "dpmpp_2m_sde", scheduler: "karras", steps: 25, cfg: 4, style: "linear-gradient(135deg,#2a1a1a,#3a2a1a,#1a1a2a)", sampleDesc: "부분 수정, 오브젝트 교체", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/aeba5afe-8bde-41d2-9150-8eea2eeda9a4/width=450/aeba5afe-8bde-41d2-9150-8eea2eeda9a4.jpeg" }] },
   batch: { recommended: [{ name: "Juggernaut XL v9", id: "133005", base: "SDXL", vram: 8, desc: "배치 안정성 최고 — 대량 생성 시 일관된 품질", rating: 4.9, dl: "3.2M", sampler: "dpmpp_2m_sde", scheduler: "karras", steps: 30, cfg: 4.5, style: "linear-gradient(135deg,#0a1a1a,#1a3a2a,#2a1a1a)", sampleDesc: "대량 일괄 생성", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/7b7b5c59-e975-4a3d-babe-b29aa577d237/width=450/7b7b5c59-e975-4a3d-babe-b29aa577d237.jpeg" }] },
 };
@@ -1650,7 +1650,15 @@ function InstallDownloads({ theme, compact, lang }) {
   const [expanded, setExpanded] = useState(null);
 
   const downloadFile = (script) => {
-    showExport(script.content, script.filename);
+    const blob = new Blob([script.content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = script.filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const filtered = osFilter === "all" ? INSTALL_SCRIPTS : INSTALL_SCRIPTS.filter(s => s.os.toLowerCase().includes(osFilter));
@@ -2577,7 +2585,7 @@ export default function App() {
   const [ms, setMs] = useState("realistic");
   const [tutFilter, setTutFilter] = useState("all");
   const [activeTut, setActiveTut] = useState(null);
-  const [theme, setTheme] = useState("dark");
+  const [theme, setTheme] = useState("light");
   const [userVram, setUserVram] = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [wfHistory, setWfHistory] = useState([]);
@@ -2589,6 +2597,13 @@ export default function App() {
   const [improveResult, setImproveResult] = useState(null); // { analysis, improvedWf, changes }
   const [improveOriginal, setImproveOriginal] = useState(null);
   const [shareId, setShareId] = useState(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setShowScrollTop(window.scrollY > 200);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const T = THEMES[theme];
   const catObj = CATS.find(c => c.id === cat);
@@ -2832,7 +2847,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
 .g-head-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .g-head-brand{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .g-config{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.g-cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;max-width:720px;margin:0 auto}
+.g-cats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .g-tuts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .g-spec{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .g-res{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px}
@@ -2921,7 +2936,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
             {aiMode === "manual" && (
               <div className="g-cats">
                 {CATS.map((c, i) => <button key={c.id} className="hov" onClick={() => selectCategory(c.id)} style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px 12px", textAlign: "left", cursor: "pointer", transition: "all .2s", animation: `fi .3s ease ${i * .03}s both` }}>
-                  <div style={{ fontSize: 18, marginBottom: 4, color: "#fff" }}>{c.icon}</div>
+                  <div style={{ fontSize: 18, marginBottom: 4, color: theme === "dark" ? "#fff" : "#1a1918" }}>{c.icon}</div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: T.text }}>{c.label}</div>
                 </button>)}
               </div>
@@ -3361,16 +3376,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
               <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 4, fontFamily: SERIF, letterSpacing: "-0.03em" }}>{t("tutTitle")}</h1>
               <p style={{ color: T.text4, fontSize: 12 }}>{t("tutDesc")}</p>
             </div>
-            {/* Progress dashboard (#8) */}
-            <div style={{ marginBottom: 20, padding: "12px 16px", background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{t("tutProgress")}</span>
-                <span style={{ fontSize: 11, color: T.accent, fontFamily: mono }}>{completedSlides}/{totalSlides} {t("tutSlides")}</span>
-              </div>
-              <div style={{ height: 6, background: T.bg4, borderRadius: 3, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${totalSlides > 0 ? (completedSlides / totalSlides * 100) : 0}%`, background: `linear-gradient(90deg, ${T.accent}, #60a5fa)`, borderRadius: 3, transition: "width .5s" }} />
-              </div>
-            </div>
+            {/* Progress dashboard - hidden */}
             <div style={{ display: "flex", gap: 5, marginBottom: 20, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
               {[{ id: "all", l: t("lvAll") }, { id: "beginner", l: t("lvBeginnerIcon") }, { id: "intermediate", l: t("lvIntermediateIcon") }, { id: "advanced", l: t("lvAdvancedIcon") }].map(lv => (
                 <button key={lv.id} onClick={() => setTutFilter(lv.id)} style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${tutFilter === lv.id ? T.border2 : T.border}`, background: tutFilter === lv.id ? T.bg4 : T.bg2, color: tutFilter === lv.id ? T.text : T.text3, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{lv.l}</button>
@@ -3520,6 +3526,11 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
       )}
 
       <QAChat theme={theme} lang={lang} />
+
+      {showScrollTop && (
+        <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} style={{ position: "fixed", bottom: 80, right: 24, width: 40, height: 40, borderRadius: "50%", background: T.accent, border: "none", color: "#fff", fontSize: 18, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", transition: "opacity .3s" }}>↑</button>
+      )}
+
       <footer style={{ textAlign: "center", padding: "32px 24px", color: T.text4, fontSize: 10 }}><span style={{ fontFamily: SERIF, letterSpacing: "0.02em" }}>ComfyUI Studio · 2026</span></footer>
     </div>
   );
