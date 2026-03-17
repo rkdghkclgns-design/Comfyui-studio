@@ -640,6 +640,17 @@ const FONT = "'DM Sans',-apple-system,'Pretendard',sans-serif";
 const SERIF = "'Source Serif 4','Georgia',serif";
 const MONO = "'JetBrains Mono','Fira Code',monospace";
 
+const GEMINI_KEY = "AIzaSyAvuF1_SDv8tkPu-_bsZ266zYNALuz8nKQ";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`;
+async function callGemini(prompt, systemInstruction) {
+  const body = { contents: [{ parts: [{ text: prompt }] }] };
+  if (systemInstruction) body.systemInstruction = { parts: [{ text: systemInstruction }] };
+  body.generationConfig = { temperature: 0.7, maxOutputTokens: 4096 };
+  const r = await fetch(GEMINI_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const d = await r.json();
+  return d.candidates?.[0]?.content?.parts?.[0]?.text || "";
+}
+
 const LANG_LABELS = { ko: "한국어", en: "English", zh: "中文", ja: "日本語" };
 
 // ═══════════════════════════════════════════
@@ -1822,9 +1833,7 @@ function PromptBuilder({ theme, onApply, lang }) {
     if (!current) return;
     setOptimizing(true);
     try {
-      const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 500, messages: [{ role: "user", content: `ComfyUI prompt optimizer. Improve this prompt for SDXL model. Keep the same intent but make it more detailed and effective. Return ONLY the improved prompt text, nothing else.\nOriginal: ${current}` }] }) });
-      const d = await r.json();
-      const improved = d.content?.map(i => i.text || "").join("").trim();
+      const improved = (await callGemini(`ComfyUI prompt optimizer. Improve this prompt for SDXL model. Keep the same intent but make it more detailed and effective. Return ONLY the improved prompt text, nothing else.\nOriginal: ${current}`)).trim();
       if (improved) setCustomPrompt(improved);
     } catch {}
     setOptimizing(false);
@@ -1920,9 +1929,8 @@ function WorkflowDebugger({ theme, lang }) {
     setLoading(true);
     try {
       const sysLang = lang === "ko" ? "한국어" : lang === "zh" ? "中文" : lang === "ja" ? "日本語" : "English";
-      const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, system: "ComfyUI troubleshooting expert. Analyze user error messages and workflow. Respond in " + sysLang + ". JSON response: {\"diagnosis\": \"cause\", \"fixes\": [\"fix 1\", \"fix 2\"], \"prevention\": \"tip\"}", messages: [{ role: "user", content: `에러: ${errorMsg}\n\n워크플로우: ${debugWf.slice(0, 5000)}` }] }) });
-      const d = await r.json();
-      const text = d.content?.map(i => i.text || "").join("").replace(/```json|```/g, "").trim();
+      const raw = await callGemini(`에러: ${errorMsg}\n\n워크플로우: ${debugWf.slice(0, 5000)}`, "ComfyUI troubleshooting expert. Analyze user error messages and workflow. Respond in " + sysLang + ". JSON response: {\"diagnosis\": \"cause\", \"fixes\": [\"fix 1\", \"fix 2\"], \"prevention\": \"tip\"}");
+      const text = raw.replace(/```json|```/g, "").trim();
       setResult(JSON.parse(text));
     } catch { setResult({ diagnosis: t("dbAIFail"), fixes: [t("dbMoreDetail")], prevention: "" }); }
     setLoading(false);
@@ -2704,9 +2712,8 @@ export default function App() {
     if (!aiInput.trim()) return;
     setGenerating(true);
     try {
-      const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, messages: [{ role: "user", content: `ComfyUI expert. User:"${aiInput}"\nJSON only:\n{"category":"t2i|i2i|inpaint|upscale|t2v|i2v|controlnet|lora|batch","sampler":"...","scheduler":"...","steps":25,"cfg":7,"width":1024,"height":1024,"prompt":"optimized","negPrompt":"optimized","modelBase":"SD15|SDXL|Flux|Wan|Hunyuan"}` }] }) });
-      const d = await r.json();
-      const parsed = JSON.parse((d.content?.map(i => i.text || "").join("") || "").replace(/```json|```/g, "").trim());
+      const aiRaw = await callGemini(`ComfyUI expert. User:"${aiInput}"\nJSON only:\n{"category":"t2i|i2i|inpaint|upscale|t2v|i2v|controlnet|lora|batch","sampler":"...","scheduler":"...","steps":25,"cfg":7,"width":1024,"height":1024,"prompt":"optimized","negPrompt":"optimized","modelBase":"SD15|SDXL|Flux|Wan|Hunyuan"}`);
+      const parsed = JSON.parse(aiRaw.replace(/```json|```/g, "").trim());
       // Fix #2: Use parsed directly, not stale config
       const newConfig = { ...config, ...parsed };
       setCat(parsed.category);
@@ -2781,16 +2788,8 @@ ${improveJson.slice(0, 12000)}
 ## Improvement Request
 ${improveCmd}`;
 
-      const r = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514", max_tokens: 4096,
-          system: systemPrompt,
-          messages: [{ role: "user", content: userMsg }],
-        }),
-      });
-      const d = await r.json();
-      const raw = (d.content?.map(i => i.text || "").join("") || "").replace(/```json|```/g, "").trim();
+      const rawImprove = await callGemini(userMsg, systemPrompt);
+      const raw = rawImprove.replace(/```json|```/g, "").trim();
       const result = JSON.parse(raw);
 
       if (result.improved && result.analysis) {
