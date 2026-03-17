@@ -2350,7 +2350,57 @@ function NodeGraph({ workflow: wf, theme }) {
   );
 }
 
-// (QAChat component removed)
+// ═══════════════════════════════════════════
+// GUIDE SECTION
+// ═══════════════════════════════════════════
+function GuideSection({ theme, lang }) {
+  const T = THEMES[theme] || THEMES.dark;
+  const [guideTab, setGuideTab] = useState(0);
+  const isKo = lang === "ko";
+  const guideSteps = [
+    { icon: "1", text: isKo ? "화면 상단의 메뉴에서 원하는 작업 방식(수동, AI 자동, 프롬프트, 디버거 등)을 선택하세요." : "Select your preferred work mode (Manual, AI Auto, Prompt, Debugger, etc.) from the top menu." },
+    { icon: "2", text: isKo ? "생성하고자 하는 결과물에 맞춰 Text to Image, ControlNet 등의 패널을 클릭합니다." : "Click the panel that matches your desired output, such as Text to Image, ControlNet, etc." },
+    { icon: "3", text: isKo ? "상세 설정 창에서 프롬프트를 입력하고, 필요에 따라 모델(Model)이나 VRAM 설정을 내 PC 환경에 맞게 조정합니다." : "Enter your prompt in the settings panel, and adjust Model or VRAM settings to match your PC environment." },
+    { icon: "4", text: isKo ? "생성된 워크플로우를 저장하거나 즉시 실행하여 나만의 AI 아트를 완성해 보세요!" : "Save your generated workflow or run it immediately to create your own AI art!" },
+  ];
+  const articles = [
+    { title: isKo ? "ComfyUI Studio 시작하기: 누구나 쉽게 만드는 AI 아트 워크플로우" : "Getting Started with ComfyUI Studio", body: isKo ? "ComfyUI는 노드(Node) 기반으로 강력한 AI 이미지 생성 환경을 제공하지만, 초보자가 처음 접근하기에는 진입 장벽이 높은 편입니다. ComfyUI Studio는 복잡한 노드 연결 과정을 생략하고, 직관적이고 깔끔한 사용자 인터페이스(UI)를 통해 누구나 손쉽게 최적화된 워크플로우를 생성할 수 있도록 돕는 웹 기반 플랫폼입니다." : "ComfyUI provides a powerful node-based AI image generation environment, but has a steep learning curve for beginners. ComfyUI Studio is a web-based platform that lets anyone easily create optimized workflows through an intuitive UI." },
+    { title: isKo ? "다양한 AI 생성 기능을 한곳에서 경험하세요" : "Experience diverse AI generation features in one place", body: isKo ? "텍스트를 이미지로 변환하는 기본적인 Text to Image부터, 원본 이미지를 변형하는 Image to Image, 특정 부분만 수정하는 Inpainting 기술까지 모두 지원합니다. 또한, 저해상도 이미지를 고화질로 변환하는 Upscale 기능과 이미지에 생동감을 불어넣는 Video 생성 기능까지, 창작자의 의도를 완벽하게 구현할 수 있는 필수 도구들을 제공합니다." : "From Text to Image, Image to Image, and Inpainting to Upscale and Video generation \u2014 all the essential tools to bring your creative vision to life." },
+    { title: isKo ? "정교한 제어를 위한 ControlNet과 LoRA" : "ControlNet and LoRA for precise control", body: isKo ? "단순한 이미지 생성을 넘어, 전문가 수준의 디테일을 원하신다면 ControlNet과 LoRA 워크플로우를 활용해 보세요. ControlNet을 통해 캐릭터의 정확한 포즈나 배경의 원근감을 세밀하게 제어할 수 있으며, LoRA를 적용하여 특정 일러스트레이터의 화풍이나 캐릭터 디자인을 일관되게 유지할 수 있습니다. 반복적인 작업이 필요할 때는 Batch(일괄 처리) 기능을 통해 작업 효율을 극대화할 수 있습니다." : "For expert-level detail, use ControlNet to precisely control poses and perspectives, and LoRA to maintain consistent art styles. The Batch feature maximizes efficiency for repetitive tasks." },
+  ];
+  const tabLabels = [isKo ? "활용 가이드" : "Quick Guide", isKo ? "상세 소개" : "Learn More"];
+  return (
+    <div style={{ marginTop: 48, padding: "32px 0", borderTop: `1px solid ${T.border}` }}>
+      <h2 style={{ fontSize: 18, fontWeight: 700, textAlign: "center", marginBottom: 6, color: T.text }}>{isKo ? "ComfyUI Studio 활용 가이드" : "ComfyUI Studio Guide"}</h2>
+      <p style={{ textAlign: "center", fontSize: 12, color: T.text4, marginBottom: 20 }}>{isKo ? "AI 이미지 생성을 위한 워크플로우를 간편하게 만들고 관리하세요." : "Easily create and manage workflows for AI image generation."}</p>
+      <div style={{ display: "flex", justifyContent: "center", gap: 4, marginBottom: 24 }}>
+        {tabLabels.map((lb, ti) => (
+          <button key={ti} onClick={() => setGuideTab(ti)} style={{ padding: "8px 20px", borderRadius: 20, border: `1px solid ${guideTab === ti ? T.accent : T.border}`, background: guideTab === ti ? T.accent : "transparent", color: guideTab === ti ? "#fff" : T.text3, fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all .2s" }}>{lb}</button>
+        ))}
+      </div>
+      {guideTab === 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 12 }}>
+          {guideSteps.map((s, si) => (
+            <div key={si} style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 18px", display: "flex", gap: 14, alignItems: "flex-start" }}>
+              <div style={{ width: 28, height: 28, borderRadius: "50%", background: T.accent, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{s.icon}</div>
+              <p style={{ fontSize: 12, color: T.text2, lineHeight: 1.7, margin: 0 }}>{s.text}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      {guideTab === 1 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {articles.map((a, ai) => (
+            <div key={ai} style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 22px" }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: T.text, marginBottom: 10, lineHeight: 1.5 }}>{a.title}</h3>
+              <p style={{ fontSize: 12, color: T.text3, lineHeight: 1.8, margin: 0 }}>{a.body}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ═══════════════════════════════════════════
 // SPEC PANEL
@@ -3094,6 +3144,10 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
               </div>
             )}
             {/* Workflow History - hidden */}
+
+            {/* ═══ GUIDE SECTION ═══ */}
+            <GuideSection theme={theme} lang={lang} />
+
           </div>)}
 
           {step === 1 && (<div style={{ animation: "fi .35s ease" }}>
