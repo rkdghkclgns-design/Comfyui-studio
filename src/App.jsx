@@ -2813,7 +2813,6 @@ input[type=range]{-webkit-appearance:none;background:rgba(255,255,255,0.06);heig
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:${T.accent};cursor:pointer;border:none;box-shadow:0 0 8px ${T.glow}}
 textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!important}
 @keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pu{0%,100%{opacity:1}50%{opacity:.3}}
 .hov{transition:all .25s ease;border-color:transparent!important}.hov:hover{border-color:${T.border2}!important;background:${T.bg3}!important;transform:translateY(-1px)}
 .bp{background:${T.accent};color:#0a0a08;border:none;padding:10px 24px;border-radius:100px;font-weight:600;cursor:pointer;font-size:12px;font-family:inherit;letter-spacing:0.01em;transition:all .2s}
 .bp:hover{background:${T.accent2};transform:translateY(-1px)}
@@ -2851,7 +2850,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
   .color-grid{grid-template-columns:repeat(2,1fr)!important}
   .bp{padding:10px 18px;font-size:13px}
   .bs{padding:9px 14px;font-size:12px}
-  .chat-panel{width:calc(100vw - 24px)!important;bottom:12px!important;right:12px!important;max-height:80vh!important}
+
   .g-model-card{flex-direction:column!important;align-items:flex-start!important}
   .g-model-actions{flex-direction:row!important;width:100%!important;flex-wrap:wrap}
   .g-ex-wf{grid-template-columns:1fr!important}
