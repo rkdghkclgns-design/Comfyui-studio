@@ -640,7 +640,7 @@ const FONT = "'DM Sans',-apple-system,'Pretendard',sans-serif";
 const SERIF = "'Source Serif 4','Georgia',serif";
 const MONO = "'JetBrains Mono','Fira Code',monospace";
 
-const GEMINI_KEY = "AIzaSyAjmXshciBdhRe5avG4_ybUEFuPVyv6lE0";
+const GEMINI_KEY = "AIzaSyAUoRhFGJb3mNYy1RKcQMBnsIf9iYiXGU8";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
 async function callGemini(prompt, systemInstruction) {
   const body = { contents: [{ parts: [{ text: prompt }] }] };
