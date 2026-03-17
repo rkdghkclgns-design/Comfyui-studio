@@ -121,8 +121,6 @@ const LANG = {
     exportCopyMethod: "복사 방법", exportStep1: "1. 아래 텍스트 박스를 클릭하세요",
     exportStep2: "2. Ctrl+A (전체 선택) → Ctrl+C (복사)", exportStep3: "3. 메모장 또는 ComfyUI에 Ctrl+V (붙여넣기)",
     exportClose: "✕ 닫기",
-    // Chat
-    chatPlaceholder: "ComfyUI 관련 질문...", chatWelcome: "ComfyUI 관련 질문을 자유롭게 하세요!",
     // Spec
     specRecommended: "권장 사양",
     // History
@@ -168,9 +166,6 @@ const LANG = {
     dbAILoading: "AI 분석 중...", dbAIBtn: "🤖 AI 심층 분석",
     dbAIDiagnosis: "AI 진단", dbPrevention: "예방",
     dbAIFail: "AI 분석 실패", dbMoreDetail: "에러 메시지를 더 자세히 입력해주세요",
-    // Chat
-    chatExpert: "ComfyUI 전문가", chatAsk: "에 대해 무엇이든 물어보세요!",
-    chatError: "오류 발생. 다시 시도해주세요.", chatInput: "ComfyUI 관련 질문...",
     // Node ref (sub)
     nrDesc: "ComfyUI 핵심 노드의 입출력과 사용법", nrSearch: "노드 검색...",
     // Custom nodes (sub)
@@ -284,7 +279,6 @@ const LANG = {
     exportCopyMethod: "How to Copy", exportStep1: "1. Click the text box below",
     exportStep2: "2. Ctrl+A (Select All) → Ctrl+C (Copy)", exportStep3: "3. Ctrl+V (Paste) in Notepad or ComfyUI",
     exportClose: "✕ Close",
-    chatPlaceholder: "Ask about ComfyUI...", chatWelcome: "Feel free to ask anything about ComfyUI!",
     specRecommended: "Recommended Specs",
     historyTitle: "Recent Workflows",
     onboardWelcome: "Welcome to ComfyUI Workflow Studio!",
@@ -320,8 +314,6 @@ const LANG = {
     dbAILoading: "AI analyzing...", dbAIBtn: "🤖 AI Deep Analysis",
     dbAIDiagnosis: "AI Diagnosis", dbPrevention: "Prevention",
     dbAIFail: "AI analysis failed", dbMoreDetail: "Please provide more error details",
-    chatExpert: "ComfyUI Expert", chatAsk: "Ask anything about ComfyUI!",
-    chatError: "Error occurred. Please try again.", chatInput: "Ask about ComfyUI...",
     nrDesc: "Inputs, outputs and usage of core nodes", nrSearch: "Search nodes...",
     cnDesc: "Search and install via ComfyUI Manager",
     aiPlaceholder: "e.g. Realistic product background swap, 4K upscale",
@@ -423,7 +415,6 @@ const LANG = {
     exportCopyMethod: "复制方法", exportStep1: "1. 点击下方文本框",
     exportStep2: "2. Ctrl+A（全选）→ Ctrl+C（复制）", exportStep3: "3. 在记事本或ComfyUI中 Ctrl+V（粘贴）",
     exportClose: "✕ 关闭",
-    chatPlaceholder: "询问ComfyUI相关问题...", chatWelcome: "欢迎提问任何ComfyUI相关问题！",
     specRecommended: "推荐配置",
     historyTitle: "最近的工作流",
     onboardWelcome: "欢迎使用 ComfyUI Workflow Studio！",
@@ -459,8 +450,6 @@ const LANG = {
     dbAILoading: "AI分析中...", dbAIBtn: "🤖 AI深度分析",
     dbAIDiagnosis: "AI诊断", dbPrevention: "预防",
     dbAIFail: "AI分析失败", dbMoreDetail: "请提供更多错误信息",
-    chatExpert: "ComfyUI专家", chatAsk: "随时询问ComfyUI相关问题！",
-    chatError: "发生错误，请重试。", chatInput: "询问ComfyUI...",
     nrDesc: "核心节点的输入输出和用法", nrSearch: "搜索节点...",
     cnDesc: "通过ComfyUI Manager搜索安装",
     aiPlaceholder: "例：实景产品背景替换，4K超分",
@@ -562,7 +551,6 @@ const LANG = {
     exportCopyMethod: "コピー方法", exportStep1: "1. 下のテキストボックスをクリック",
     exportStep2: "2. Ctrl+A（全選択）→ Ctrl+C（コピー）", exportStep3: "3. メモ帳またはComfyUIで Ctrl+V（貼り付け）",
     exportClose: "✕ 閉じる",
-    chatPlaceholder: "ComfyUIについて質問...", chatWelcome: "ComfyUIについて何でも質問してください！",
     specRecommended: "推奨スペック",
     historyTitle: "最近のワークフロー",
     onboardWelcome: "ComfyUI Workflow Studioへようこそ！",
@@ -598,8 +586,6 @@ const LANG = {
     dbAILoading: "AI分析中...", dbAIBtn: "🤖 AI詳細分析",
     dbAIDiagnosis: "AI診断", dbPrevention: "予防",
     dbAIFail: "AI分析失敗", dbMoreDetail: "エラー情報をもっと詳しく入力してください",
-    chatExpert: "ComfyUIエキスパート", chatAsk: "ComfyUIについて何でも質問！",
-    chatError: "エラーが発生しました。再試行してください。", chatInput: "ComfyUIについて質問...",
     nrDesc: "コアノードの入出力と使い方", nrSearch: "ノード検索...",
     cnDesc: "ComfyUI Managerで検索してインストール",
     aiPlaceholder: "例：リアル製品背景差替え、4Kアップスケール",
@@ -2364,43 +2350,7 @@ function NodeGraph({ workflow: wf, theme }) {
   );
 }
 
-// ═══════════════════════════════════════════
-// Q&A CHAT
-// ═══════════════════════════════════════════
-function QAChat({ theme, lang }) {
-  const t = (key) => (LANG[lang] || LANG.ko)[key] || (LANG.ko)[key] || key;
-  const [msgs, setMsgs] = useState([]); const [input, setInput] = useState(""); const [loading, setLoading] = useState(false); const [open, setOpen] = useState(false); const endRef = useRef(null);
-  const T = THEMES[theme] || THEMES.dark;
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
-  const ask = async () => {
-    if (!input.trim() || loading) return; const q = input.trim(); setInput(""); setMsgs(p => [...p, { role: "user", text: q }]); setLoading(true);
-    try {
-      const chatLang = lang === "ko" ? "한국어" : lang === "zh" ? "中文" : lang === "ja" ? "日本語" : "English";
-      const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, system: "ComfyUI expert. Respond in " + chatLang + ". Include 2026 latest info.", messages: [...msgs.map(m => ({ role: m.role === "user" ? "user" : "assistant", content: m.text })), { role: "user", content: q }] }) });
-      const d = await r.json(); setMsgs(p => [...p, { role: "assistant", text: d.content?.map(i => i.text || "").join("") || t("chatError") }]);
-    } catch { setMsgs(p => [...p, { role: "assistant", text: t("chatError") }]); }
-    setLoading(false);
-  };
-  if (!open) return <button onClick={() => setOpen(true)} style={{ position: "fixed", bottom: 24, right: 24, width: 52, height: 52, borderRadius: "50%", background: "linear-gradient(135deg,#2dd4a8,#60a5fa)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: "#fff", boxShadow: "0 4px 20px rgba(45,212,168,.3)", zIndex: 200 }}>💬</button>;
-  return (
-    <div className="chat-panel" style={{ position: "fixed", bottom: 24, right: 24, width: 380, maxWidth: "calc(100vw - 48px)", maxHeight: "70vh", background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 16, display: "flex", flexDirection: "column", zIndex: 200, boxShadow: "0 8px 40px rgba(0,0,0,.5)", overflow: "hidden" }}>
-      <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 8, height: 8, borderRadius: "50%", background: "#2dd4a8" }} /><span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{t("chatExpert")}</span></div>
-        <button onClick={() => setOpen(false)} style={{ background: "transparent", border: "none", color: T.text3, cursor: "pointer", fontSize: 16 }}>✕</button>
-      </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10, minHeight: 160, maxHeight: "50vh" }}>
-        {msgs.length === 0 && <div style={{ fontSize: 12, color: T.text3, lineHeight: 1.6 }}>{t("chatAsk")}</div>}
-        {msgs.map((m, i) => <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}><div style={{ maxWidth: "85%", padding: "10px 14px", borderRadius: m.role === "user" ? "12px 12px 2px 12px" : "12px 12px 12px 2px", background: m.role === "user" ? "#1a2a3a" : T.bg3, fontSize: 12, color: m.role === "user" ? "#8bb8e8" : T.text2, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{m.text}</div></div>)}
-        {loading && <div style={{ display: "flex", gap: 4 }}>{[0, 1, 2].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: "#2dd4a8", animation: `pu 1s ease ${i * .2}s infinite` }} />)}</div>}
-        <div ref={endRef} />
-      </div>
-      <div style={{ padding: "10px 12px", borderTop: `1px solid ${T.border}`, display: "flex", gap: 8, flexShrink: 0 }}>
-        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && ask()} placeholder={t("chatInput")} style={{ flex: 1, background: T.bg3, border: `1px solid ${T.border2}`, borderRadius: 8, padding: "9px 12px", color: T.text, fontSize: 12, outline: "none" }} />
-        <button onClick={ask} disabled={loading || !input.trim()} style={{ background: loading || !input.trim() ? T.bg4 : "#2dd4a8", border: "none", borderRadius: 8, padding: "0 16px", color: loading || !input.trim() ? T.text4 : "#050505", fontWeight: 700, cursor: "pointer" }}>→</button>
-      </div>
-    </div>
-  );
-}
+// (QAChat component removed)
 
 // ═══════════════════════════════════════════
 // SPEC PANEL
@@ -2578,7 +2528,6 @@ function Onboarding({ onDone, theme, lang }) {
     { title: t("navWorkflow"), desc: lang === "ko" ? "카테고리를 선택하거나 AI에게 설명하여 워크플로우를 생성합니다." : lang === "en" ? "Choose a category or describe to AI to generate workflows." : lang === "zh" ? "选择类型或向AI描述需求来生成工作流。" : "カテゴリを選択するかAIに説明してワークフローを生成。", emoji: "✦" },
     { title: t("navModels"), desc: lang === "ko" ? "Civitai 추천 모델을 탐색하고 파라미터를 적용합니다." : lang === "en" ? "Browse Civitai recommended models and apply settings in one click." : lang === "zh" ? "浏览Civitai推荐模型并一键应用参数。" : "Civitaiおすすめモデルを閲覧し、ワンクリックで設定を適用。", emoji: "🎨" },
     { title: t("navTutorials"), desc: lang === "ko" ? "슬라이드 강의로 ComfyUI를 단계별로 마스터하세요." : lang === "en" ? "Master ComfyUI step by step with slide lessons and quizzes." : lang === "zh" ? "通过幻灯片课程逐步掌握ComfyUI。" : "スライド講座でComfyUIをステップバイステップでマスター。", emoji: "📖" },
-    { title: lang === "ko" ? "AI 챗봇" : lang === "en" ? "AI Chatbot" : lang === "zh" ? "AI 聊天机器人" : "AIチャットボット", desc: lang === "ko" ? "우측 하단 💬 버튼으로 질문하세요." : lang === "en" ? "Ask questions via the 💬 button at bottom right." : lang === "zh" ? "点击右下角💬按钮提问。" : "右下の💬ボタンで質問してください。", emoji: "💬" },
   ];
   const s = steps[step];
   return (
@@ -3546,8 +3495,6 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
           </div>
         </div>
       )}
-
-      <QAChat theme={theme} lang={lang} />
 
       {showScrollTop && (
         <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} style={{ position: "fixed", bottom: 80, right: 24, width: 40, height: 40, borderRadius: "50%", background: T.accent, border: "none", color: "#fff", fontSize: 18, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", transition: "opacity .3s" }}>↑</button>
