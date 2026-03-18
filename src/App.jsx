@@ -640,13 +640,11 @@ const FONT = "'DM Sans',-apple-system,'Pretendard',sans-serif";
 const SERIF = "'Source Serif 4','Georgia',serif";
 const MONO = "'JetBrains Mono','Fira Code',monospace";
 
-const GEMINI_KEY = "AIzaSyBTe8BYMQXkkg6KlD9TvZjr2fHRb9tqDCA";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
+const GEMINI_PROXY_URL = "https://pkwbqbxuujpcvndpacsc.supabase.co/functions/v1/gemini-proxy";
 async function callGemini(prompt, systemInstruction) {
-  const body = { contents: [{ parts: [{ text: prompt }] }] };
+  const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7, maxOutputTokens: 4096 } };
   if (systemInstruction) body.systemInstruction = { parts: [{ text: systemInstruction }] };
-  body.generationConfig = { temperature: 0.7, maxOutputTokens: 4096 };
-  const r = await fetch(GEMINI_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const r = await fetch(GEMINI_PROXY_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!r.ok) { const err = await r.json().catch(() => ({})); throw new Error(err.error?.message || `Gemini API error: ${r.status}`); }
   const d = await r.json();
   const parts = d.candidates?.[0]?.content?.parts || [];
