@@ -2453,24 +2453,53 @@ function ShowcaseSection({ theme, lang }) {
   const parseWorkflow = (jsonStr) => {
     try {
       const raw = JSON.parse(jsonStr);
-      let nodes = [];
-      if (Array.isArray(raw)) { nodes = raw; }
-      else if (typeof raw === "object" && raw !== null) {
-        // Check if it's {nodes: [...], links: [...]} format (ComfyUI web format)
-        if (Array.isArray(raw.nodes)) { nodes = raw.nodes.map(n => ({ class_type: n.type, inputs: n.widgets_values ? {} : {}, _widgets: n.widgets_values, _type: n.type })); }
-        // API format: {"1": {class_type, inputs}, "2": ...}
-        else { nodes = Object.values(raw); }
+      const info = { model: null, steps: null, cfg: null, sampler: null, scheduler: null, width: null, height: null, seed: null, positive: null, negative: null, nodeCount: 0, detectedTags: [] };
+
+      // Detect format and extract nodes
+      let isWebFormat = false;
+      let nodeList = [];
+
+      if (typeof raw === "object" && raw !== null && Array.isArray(raw.nodes)) {
+        // ComfyUI WEB format: {nodes: [{id, type, widgets_values, ...}], links: [...]}
+        isWebFormat = true;
+        nodeList = raw.nodes;
+      } else if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
+        // ComfyUI API format: {"1": {class_type, inputs}, "2": ...}
+        nodeList = Object.values(raw);
+      } else if (Array.isArray(raw)) {
+        nodeList = raw;
       }
-      const info = { model: null, steps: null, cfg: null, sampler: null, scheduler: null, width: null, height: null, seed: null, positive: null, negative: null, nodeCount: nodes.length, detectedTags: [] };
-      for (const n of nodes) {
-        const ct = n.class_type || n._type || n.type || "";
-        const inp = n.inputs || {};
-        // Parse widgets_values for web format
-        if (ct.includes("CheckpointLoader")) info.model = inp.ckpt_name || null;
-        if (ct === "KSampler" || ct === "KSamplerAdvanced") { info.steps = inp.steps; info.cfg = inp.cfg; info.sampler = inp.sampler_name || inp.sampler; info.scheduler = inp.scheduler; info.seed = inp.seed; }
-        if (ct === "EmptyLatentImage" || ct === "EmptySD3LatentImage") { info.width = inp.width; info.height = inp.height; }
-        if (ct === "CLIPTextEncode") { const txt = typeof inp.text === "string" ? inp.text : ""; if (txt && !info.positive) info.positive = txt; else if (txt && !info.negative) info.negative = txt; }
-        // Detect tags from node types
+
+      info.nodeCount = nodeList.length;
+
+      for (const n of nodeList) {
+        const ct = n.class_type || n.type || "";
+        const wv = n.widgets_values || [];
+
+        if (isWebFormat) {
+          // Web format: extract from widgets_values array
+          // CheckpointLoaderSimple: [ckpt_name]
+          if (ct.includes("CheckpointLoader") && wv.length >= 1) { info.model = typeof wv[0] === "string" ? wv[0] : null; }
+          // KSampler: [seed, control_after_generate, steps, cfg, sampler_name, scheduler, denoise]
+          if (ct === "KSampler" && wv.length >= 6) { info.seed = wv[0]; info.steps = wv[2]; info.cfg = wv[3]; info.sampler = typeof wv[4] === "string" ? wv[4] : null; info.scheduler = typeof wv[5] === "string" ? wv[5] : null; }
+          if (ct === "KSamplerAdvanced" && wv.length >= 8) { info.steps = wv[3]; info.cfg = wv[4]; info.sampler = typeof wv[5] === "string" ? wv[5] : null; info.scheduler = typeof wv[6] === "string" ? wv[6] : null; }
+          // EmptyLatentImage: [width, height, batch_size]
+          if ((ct === "EmptyLatentImage" || ct === "EmptySD3LatentImage") && wv.length >= 2) { info.width = wv[0]; info.height = wv[1]; }
+          // CLIPTextEncode: [text]
+          if (ct === "CLIPTextEncode" && wv.length >= 1 && typeof wv[0] === "string") {
+            if (!info.positive) info.positive = wv[0];
+            else if (!info.negative) info.negative = wv[0];
+          }
+        } else {
+          // API format: extract from inputs object
+          const inp = n.inputs || {};
+          if (ct.includes("CheckpointLoader")) info.model = inp.ckpt_name || null;
+          if (ct === "KSampler" || ct === "KSamplerAdvanced") { info.steps = inp.steps; info.cfg = inp.cfg; info.sampler = inp.sampler_name || inp.sampler; info.scheduler = inp.scheduler; info.seed = inp.seed; }
+          if (ct === "EmptyLatentImage" || ct === "EmptySD3LatentImage") { info.width = inp.width; info.height = inp.height; }
+          if (ct === "CLIPTextEncode") { const txt = typeof inp.text === "string" ? inp.text : ""; if (txt && !info.positive) info.positive = txt; else if (txt && !info.negative) info.negative = txt; }
+        }
+
+        // Detect tags from node types (both formats)
         if (ct.includes("ControlNet") || ct.includes("controlnet")) info.detectedTags.push("controlnet");
         if (ct.includes("Upscale") || ct.includes("upscale")) info.detectedTags.push("upscale");
         if (ct.includes("Inpaint") || ct.includes("inpaint")) info.detectedTags.push("inpaint");
@@ -2478,6 +2507,7 @@ function ShowcaseSection({ theme, lang }) {
         if (ct.includes("Video") || ct.includes("video") || ct.includes("AnimateDiff") || ct.includes("Hunyuan")) info.detectedTags.push("video");
         if (ct.includes("VAEEncode") && !ct.includes("Inpaint")) info.detectedTags.push("img2img");
       }
+
       // Detect model-based tags
       const modelLower = (info.model || "").toLowerCase();
       if (modelLower.includes("xl") || modelLower.includes("sdxl")) info.detectedTags.push("SDXL");
@@ -2485,7 +2515,6 @@ function ShowcaseSection({ theme, lang }) {
       else if (modelLower.includes("1.5") || modelLower.includes("15") || modelLower.includes("sd1")) info.detectedTags.push("SD1.5");
       if (modelLower.includes("anime") || modelLower.includes("counterfeit") || modelLower.includes("pastel")) info.detectedTags.push("anime");
       if (modelLower.includes("real") || modelLower.includes("photo")) info.detectedTags.push("realistic");
-      // If no img2img detected, it's likely txt2img
       if (!info.detectedTags.includes("img2img")) info.detectedTags.push("txt2img");
       info.detectedTags = [...new Set(info.detectedTags)];
       return info;
@@ -2720,12 +2749,15 @@ function ShowcaseSection({ theme, lang }) {
             {selectedPost.description && <p style={{ fontSize: 14, color: T.text2, marginBottom: 16, lineHeight: 1.7 }}>{selectedPost.description}</p>}
             {selectedPost.tags?.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>{selectedPost.tags.map(t => <span key={t} style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, background: `${T.accent}15`, color: T.accent, border: `1px solid ${T.accent}30` }}>{t}</span>)}</div>}
             {/* Workflow Rich Preview */}
-            {(() => { const info = parseWorkflow(selectedPost.workflow_json); return info ? <WorkflowRichPreview info={info} /> : null; })()}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <span style={{ fontSize: 13, color: T.text2, fontWeight: 600 }}>Workflow JSON</span>
-              <button onClick={() => copyJSON(selectedPost.workflow_json)} style={{ padding: "5px 14px", borderRadius: 8, border: `1px solid ${T.border}`, background: T.bg3, color: T.text2, fontSize: 12, cursor: "pointer" }}>{isKo ? "복사" : "Copy"}</button>
-            </div>
-            <pre style={{ background: T.bg, padding: 16, borderRadius: 12, border: `1px solid ${T.border}`, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: T.text2, overflow: "auto", maxHeight: 300, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{selectedPost.workflow_json}</pre>
+            {(() => { const info = parseWorkflow(selectedPost.workflow_json); return info ? <div style={{ marginBottom: 16 }}><WorkflowRichPreview info={info} /></div> : null; })()}
+            {/* Collapsible JSON */}
+            <details style={{ marginTop: 8 }}>
+              <summary style={{ cursor: "pointer", fontSize: 13, color: T.text2, fontWeight: 600, padding: "8px 0", display: "flex", alignItems: "center", gap: 8, userSelect: "none" }}>
+                <span>Workflow JSON</span>
+                <button onClick={(e) => { e.preventDefault(); copyJSON(selectedPost.workflow_json); }} style={{ padding: "4px 12px", borderRadius: 6, border: `1px solid ${T.border}`, background: T.bg3, color: T.text2, fontSize: 11, cursor: "pointer", marginLeft: "auto" }}>{isKo ? "복사" : "Copy"}</button>
+              </summary>
+              <pre style={{ background: T.bg, padding: 16, borderRadius: 12, border: `1px solid ${T.border}`, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: T.text2, overflow: "auto", maxHeight: 400, whiteSpace: "pre-wrap", wordBreak: "break-all", marginTop: 8 }}>{(() => { try { return JSON.stringify(JSON.parse(selectedPost.workflow_json), null, 2); } catch { return selectedPost.workflow_json; } })()}</pre>
+            </details>
             {user && user.id === selectedPost.user_id && <button onClick={() => handleDelete(selectedPost.id)} style={{ marginTop: 16, padding: "8px 18px", borderRadius: 10, border: `1px solid #e55`, background: "transparent", color: "#e55", fontSize: 12, cursor: "pointer" }}>{isKo ? "삭제" : "Delete"}</button>}
           </div>
         </div>
