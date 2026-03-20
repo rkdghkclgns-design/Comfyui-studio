@@ -2570,7 +2570,7 @@ function ShowcaseSection({ theme, lang }) {
         {info.model && (
           <div style={{ ...box, marginBottom: 12 }}>
             <span style={label}>{isKo ? "✓ 모델 파일명" : "✓ Model Filename"}</span>
-            <a href={`https://civitai.com/search/models?sortBy=models_v9&query=${encodeURIComponent(info.model.replace(/\.(safetensors|ckpt|pt|bin)$/i, "").replace(/[-_]/g, " "))}`} target="_blank" rel="noopener noreferrer" style={{ ...val, fontSize: 15, ...mono, display: "block", color: T.accent, textDecoration: "none", cursor: "pointer" }}>
+            <a href={`https://civitai.com/models?query=${encodeURIComponent(info.model.replace(/\.(safetensors|ckpt|pt|bin)$/i, "").replace(/[-_]/g, " ").replace(/\s+/g, " ").trim())}`} target="_blank" rel="noopener noreferrer" style={{ ...val, fontSize: 15, ...mono, display: "block", color: T.accent, textDecoration: "none", cursor: "pointer" }}>
               {info.model} <span style={{ fontSize: 10, opacity: 0.7 }}>↗</span>
             </a>
             <div style={{ fontSize: 10, color: T.text4, marginTop: 6 }}>{isKo ? "클릭하면 Civitai에서 모델을 검색합니다" : "Click to search this model on Civitai"}</div>
@@ -3026,8 +3026,10 @@ function ShowcaseSection({ theme, lang }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
             {pagedPosts.map(post => {
               const catInfo = CATEGORIES.find(c => c.id === post.category);
+              const lbl = post.likes_count >= 80 ? { text: "BEST", bg: "#f472b6", color: "#fff" } : post.likes_count >= 50 ? { text: isKo ? "인기" : "HOT", bg: "#fbbf24", color: "#1a1a1a" } : null;
               return (
-              <div key={post.id} onClick={() => setSelectedPost(post)} style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, cursor: "pointer", transition: "border-color .2s" }}>
+              <div key={post.id} onClick={() => setSelectedPost(post)} style={{ background: T.bg2, border: `1px solid ${lbl ? lbl.bg + "40" : T.border}`, borderRadius: 12, padding: 16, cursor: "pointer", transition: "border-color .2s", position: "relative" }}>
+                {lbl && <span style={{ position: "absolute", top: -6, right: 12, padding: "2px 8px", borderRadius: 6, fontSize: 9, fontWeight: 800, background: lbl.bg, color: lbl.color, letterSpacing: "0.5px" }}>{lbl.text}</span>}
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                   {post.avatar_url && <img src={post.avatar_url} alt="" style={{ width: 18, height: 18, borderRadius: "50%" }} />}
                   <span style={{ fontSize: 11, color: T.text2 }}>{post.username}</span>
