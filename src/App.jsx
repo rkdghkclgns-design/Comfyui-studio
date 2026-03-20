@@ -2724,29 +2724,6 @@ function ShowcaseSection({ theme, lang }) {
       setViewBox({ x: minX, y: minY, w: maxX - minX, h: maxY - minY });
     }, [graphData]);
 
-    // Attach wheel handler via useEffect to use { passive: false }
-    useEffect(() => {
-      const el = svgRef.current;
-      if (!el) return;
-      const onWheel = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const factor = e.deltaY > 0 ? 1.15 : 0.87;
-        const rect = el.getBoundingClientRect();
-        if (!rect) return;
-        const mx = (e.clientX - rect.left) / rect.width;
-        const my = (e.clientY - rect.top) / rect.height;
-        setViewBox(prev => {
-          if (!prev) return prev;
-          const nw = prev.w * factor;
-          const nh = prev.h * factor;
-          return { x: prev.x - (nw - prev.w) * mx, y: prev.y - (nh - prev.h) * my, w: nw, h: nh };
-        });
-      };
-      el.addEventListener("wheel", onWheel, { passive: false });
-      return () => el.removeEventListener("wheel", onWheel);
-    });
-
     if (!graphData || !viewBox) return null;
 
     const handleMouseDown = (e) => { setDragging(true); setDragStart({ x: e.clientX, y: e.clientY }); };
@@ -2771,9 +2748,26 @@ function ShowcaseSection({ theme, lang }) {
           <span style={{ fontSize: 9, color: GT.text4 }}>{gKo ? "마우스 휠: 확대/축소, 드래그: 이동" : "Wheel: zoom, Drag: pan"}</span>
         </div>
         <svg
-          ref={svgRef}
+          ref={(el) => {
+            svgRef.current = el;
+            if (el && !el._wheelBound) {
+              el._wheelBound = true;
+              el.addEventListener("wheel", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const factor = e.deltaY > 0 ? 1.15 : 0.87;
+                const rect = el.getBoundingClientRect();
+                const mx = (e.clientX - rect.left) / rect.width;
+                const my = (e.clientY - rect.top) / rect.height;
+                setViewBox(prev => {
+                  if (!prev) return prev;
+                  return { x: prev.x - (prev.w * factor - prev.w) * mx, y: prev.y - (prev.h * factor - prev.h) * my, w: prev.w * factor, h: prev.h * factor };
+                });
+              }, { passive: false });
+            }
+          }}
           viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
-          style={{ width: "100%", height: 320, cursor: dragging ? "grabbing" : "grab", background: GT.bg }}
+          style={{ width: "100%", height: 320, cursor: dragging ? "grabbing" : "grab", background: GT.bg, touchAction: "none" }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
