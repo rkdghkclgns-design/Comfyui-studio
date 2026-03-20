@@ -2661,152 +2661,122 @@ function ShowcaseSection({ theme, lang }) {
 
   // Interactive workflow graph component with zoom/pan
   function WorkflowGraphView({ rawParsed, theme: GT, isKo: gKo }) {
-    const svgRef = useRef(null);
-    const [viewBox, setViewBox] = useState(null);
-    const [dragging, setDragging] = useState(false);
-    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-    const [zoom, setZoom] = useState(1);
+    const containerRef = useRef(null);
+    const vb = useRef(null);
+    const dragState = useRef({ active: false, sx: 0, sy: 0 });
 
     const NODE_COLORS = { "CheckpointLoaderSimple": "#2dd4a8", "CheckpointLoader": "#2dd4a8", "CLIPTextEncode": "#fbbf24", "KSampler": "#f472b6", "KSamplerAdvanced": "#f472b6", "VAEDecode": "#fb923c", "SaveImage": "#60a5fa", "EmptyLatentImage": "#22d3ee", "LoraLoader": "#a78bfa", "ControlNetApply": "#34d399", "LoadImage": "#818cf8", "VAEEncode": "#fb923c", "UpscaleLatent": "#4ade80" };
     const getColor = (t) => { for (const [k, v] of Object.entries(NODE_COLORS)) { if (t.includes(k)) return v; } return "#9ca3af"; };
 
-    // Extract graph data
     const graphData = (() => {
       if (!rawParsed) return null;
-      const nodes = [];
-      const links = [];
-
+      const nodes = []; const links = [];
       if (Array.isArray(rawParsed.nodes)) {
-        // Web format with positions
         for (const n of rawParsed.nodes) {
-          const wv = n.widgets_values || [];
-          const details = [];
+          const wv = n.widgets_values || []; const details = [];
           if (n.type?.includes("CheckpointLoader") && wv[0]) details.push(String(wv[0]));
-          if (n.type === "KSampler" && wv.length >= 6) { details.push(`Steps: ${wv[2]}`); details.push(`CFG: ${wv[3]}`); details.push(`${wv[4]}/${wv[5]}`); }
+          if (n.type === "KSampler" && wv.length >= 6) { details.push(`Steps: ${wv[2]}, CFG: ${wv[3]}`); details.push(`${wv[4]}/${wv[5]}`); }
           if (n.type === "CLIPTextEncode" && typeof wv[0] === "string") details.push(wv[0].length > 50 ? wv[0].slice(0, 50) + "..." : wv[0]);
-          if ((n.type === "EmptyLatentImage") && wv.length >= 2) details.push(`${wv[0]}x${wv[1]}`);
+          if (n.type === "EmptyLatentImage" && wv.length >= 2) details.push(`${wv[0]}x${wv[1]}`);
           if (n.type?.includes("LoraLoader") && wv[0]) details.push(String(wv[0]));
           const minH = 36 + details.length * 18;
-          nodes.push({ id: n.id, type: n.type || "Unknown", x: n.pos?.[0] || 0, y: n.pos?.[1] || 0, w: Math.max(n.size?.[0] || 200, 180), h: Math.max(n.size?.[1] || 80, minH), details });
+          nodes.push({ id: n.id, type: n.type || "?", x: n.pos?.[0] || 0, y: n.pos?.[1] || 0, w: Math.max(n.size?.[0] || 200, 180), h: Math.max(n.size?.[1] || 80, minH), details });
         }
-        if (Array.isArray(rawParsed.links)) {
-          for (const lk of rawParsed.links) {
-            if (lk.length >= 5) links.push({ from: lk[1], to: lk[3], type: lk[5] || "" });
-          }
-        }
+        if (Array.isArray(rawParsed.links)) { for (const lk of rawParsed.links) { if (lk.length >= 5) links.push({ from: lk[1], to: lk[3] }); } }
       } else if (typeof rawParsed === "object" && !Array.isArray(rawParsed)) {
-        // API format — auto-layout
-        const entries = Object.entries(rawParsed);
-        let col = 0;
+        const entries = Object.entries(rawParsed); let col = 0;
         for (const [key, n] of entries) {
-          const ct = n.class_type || "Unknown";
-          const inp = n.inputs || {};
-          const details = [];
+          const ct = n.class_type || "?"; const inp = n.inputs || {}; const details = [];
           if (ct.includes("CheckpointLoader") && inp.ckpt_name) details.push(inp.ckpt_name);
-          if (ct === "KSampler" || ct === "KSamplerAdvanced") { if (inp.steps) details.push(`Steps: ${inp.steps}`); if (inp.cfg) details.push(`CFG: ${inp.cfg}`); if (inp.sampler_name) details.push(inp.sampler_name); }
+          if (ct === "KSampler" || ct === "KSamplerAdvanced") { if (inp.steps) details.push(`Steps: ${inp.steps}, CFG: ${inp.cfg || ""}`); if (inp.sampler_name) details.push(inp.sampler_name); }
           if (ct === "CLIPTextEncode" && typeof inp.text === "string") details.push(inp.text.length > 50 ? inp.text.slice(0, 50) + "..." : inp.text);
           if (ct === "EmptyLatentImage" && inp.width) details.push(`${inp.width}x${inp.height}`);
           nodes.push({ id: parseInt(key) || col, type: ct, x: (col % 4) * 260, y: Math.floor(col / 4) * 160, w: 220, h: Math.max(60, 36 + details.length * 18), details });
-          // Detect links from input references
-          for (const [, v] of Object.entries(inp)) { if (Array.isArray(v) && v.length === 2 && typeof v[0] === "string") { const srcId = parseInt(v[0]); if (!isNaN(srcId)) links.push({ from: srcId, to: parseInt(key) || col }); } }
+          for (const [, v] of Object.entries(inp)) { if (Array.isArray(v) && v.length === 2 && typeof v[0] === "string") { const sid = parseInt(v[0]); if (!isNaN(sid)) links.push({ from: sid, to: parseInt(key) || col }); } }
           col++;
         }
       }
       return nodes.length > 0 ? { nodes, links } : null;
     })();
 
-    useEffect(() => {
-      if (!graphData) return;
-      const { nodes } = graphData;
-      const minX = Math.min(...nodes.map(n => n.x)) - 40;
-      const minY = Math.min(...nodes.map(n => n.y)) - 40;
-      const maxX = Math.max(...nodes.map(n => n.x + n.w)) + 40;
-      const maxY = Math.max(...nodes.map(n => n.y + n.h)) + 40;
-      setViewBox({ x: minX, y: minY, w: maxX - minX, h: maxY - minY });
-    }, [graphData]);
+    if (!graphData) return null;
 
-    if (!graphData || !viewBox) return null;
+    const nodeMap = {}; graphData.nodes.forEach(n => { nodeMap[n.id] = n; });
+    const minX = Math.min(...graphData.nodes.map(n => n.x)) - 50;
+    const minY = Math.min(...graphData.nodes.map(n => n.y)) - 50;
+    const maxX = Math.max(...graphData.nodes.map(n => n.x + n.w)) + 50;
+    const maxY = Math.max(...graphData.nodes.map(n => n.y + n.h)) + 50;
+    const initVB = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 
-    const handleMouseDown = (e) => { setDragging(true); setDragStart({ x: e.clientX, y: e.clientY }); };
-    const handleMouseMove = (e) => {
-      if (!dragging) return;
-      const rect = svgRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const dx = (e.clientX - dragStart.x) * viewBox.w / rect.width;
-      const dy = (e.clientY - dragStart.y) * viewBox.h / rect.height;
-      setViewBox(prev => ({ ...prev, x: prev.x - dx, y: prev.y - dy }));
-      setDragStart({ x: e.clientX, y: e.clientY });
+    const updateSvgVB = () => {
+      const svg = containerRef.current?.querySelector("svg");
+      if (svg && vb.current) svg.setAttribute("viewBox", `${vb.current.x} ${vb.current.y} ${vb.current.w} ${vb.current.h}`);
     };
-    const handleMouseUp = () => setDragging(false);
 
-    const nodeMap = {};
-    graphData.nodes.forEach(n => { nodeMap[n.id] = n; });
+    const zoomBy = (factor, cx, cy) => {
+      if (!vb.current) return;
+      const v = vb.current;
+      const nw = v.w * factor; const nh = v.h * factor;
+      vb.current = { x: v.x - (nw - v.w) * cx, y: v.y - (nh - v.h) * cy, w: nw, h: nh };
+      updateSvgVB();
+    };
+
+    const setupEvents = (el) => {
+      if (!el || el._evBound) return;
+      el._evBound = true;
+      const svg = el.querySelector("svg");
+      if (!svg) return;
+      vb.current = { ...initVB };
+
+      svg.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const rect = svg.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) / rect.width;
+        const my = (e.clientY - rect.top) / rect.height;
+        zoomBy(e.deltaY > 0 ? 1.12 : 0.89, mx, my);
+      }, { passive: false });
+
+      svg.addEventListener("mousedown", (e) => {
+        dragState.current = { active: true, sx: e.clientX, sy: e.clientY };
+        svg.style.cursor = "grabbing";
+      });
+      window.addEventListener("mousemove", (e) => {
+        if (!dragState.current.active || !vb.current) return;
+        const rect = svg.getBoundingClientRect();
+        const dx = (e.clientX - dragState.current.sx) * vb.current.w / rect.width;
+        const dy = (e.clientY - dragState.current.sy) * vb.current.h / rect.height;
+        vb.current = { ...vb.current, x: vb.current.x - dx, y: vb.current.y - dy };
+        dragState.current.sx = e.clientX;
+        dragState.current.sy = e.clientY;
+        updateSvgVB();
+      });
+      window.addEventListener("mouseup", () => { dragState.current.active = false; svg.style.cursor = "grab"; });
+    };
 
     return (
-      <div style={{ marginTop: 12, background: GT.bg2, borderRadius: 14, border: `1px solid ${GT.border}`, overflow: "hidden" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: `1px solid ${GT.border}` }}>
+      <div ref={setupEvents} style={{ marginTop: 12, background: GT.bg2, borderRadius: 14, border: `1px solid ${GT.border}`, overflow: "hidden" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 16px", borderBottom: `1px solid ${GT.border}` }}>
           <span style={{ fontSize: 10, color: GT.text4, fontWeight: 600 }}>{gKo ? "워크플로우 노드 그래프" : "Workflow Node Graph"}</span>
-          <span style={{ fontSize: 9, color: GT.text4 }}>{gKo ? "마우스 휠: 확대/축소, 드래그: 이동" : "Wheel: zoom, Drag: pan"}</span>
+          <div style={{ display: "flex", gap: 4 }}>
+            <button onClick={() => zoomBy(0.7, 0.5, 0.5)} style={{ padding: "2px 8px", borderRadius: 4, border: `1px solid ${GT.border}`, background: GT.bg3, color: GT.text2, fontSize: 12, cursor: "pointer" }}>+</button>
+            <button onClick={() => zoomBy(1.4, 0.5, 0.5)} style={{ padding: "2px 8px", borderRadius: 4, border: `1px solid ${GT.border}`, background: GT.bg3, color: GT.text2, fontSize: 12, cursor: "pointer" }}>-</button>
+            <button onClick={() => { vb.current = { ...initVB }; updateSvgVB(); }} style={{ padding: "2px 8px", borderRadius: 4, border: `1px solid ${GT.border}`, background: GT.bg3, color: GT.text2, fontSize: 10, cursor: "pointer" }}>Reset</button>
+          </div>
         </div>
-        <svg
-          ref={(el) => {
-            svgRef.current = el;
-            if (el && !el._wheelBound) {
-              el._wheelBound = true;
-              el.addEventListener("wheel", (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const factor = e.deltaY > 0 ? 1.15 : 0.87;
-                const rect = el.getBoundingClientRect();
-                const mx = (e.clientX - rect.left) / rect.width;
-                const my = (e.clientY - rect.top) / rect.height;
-                setViewBox(prev => {
-                  if (!prev) return prev;
-                  return { x: prev.x - (prev.w * factor - prev.w) * mx, y: prev.y - (prev.h * factor - prev.h) * my, w: prev.w * factor, h: prev.h * factor };
-                });
-              }, { passive: false });
-            }
-          }}
-          viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
-          style={{ width: "100%", height: 420, cursor: dragging ? "grabbing" : "grab", background: "#0a0a09", touchAction: "none" }}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-        >
-          {/* Connection lines */}
-          {graphData.links.map((lk, i) => {
-            const src = nodeMap[lk.from];
-            const tgt = nodeMap[lk.to];
-            if (!src || !tgt) return null;
-            const sx = src.x + src.w;
-            const sy = src.y + src.h / 2;
-            const tx = tgt.x;
-            const ty = tgt.y + tgt.h / 2;
-            const cx = Math.abs(tx - sx) * 0.4 + 30;
-            return <path key={i} d={`M${sx},${sy} C${sx + cx},${sy} ${tx - cx},${ty} ${tx},${ty}`} fill="none" stroke={getColor(src.type)} strokeWidth="3" opacity="0.6" />;
-          })}
-          {/* Nodes */}
-          {graphData.nodes.map(n => {
-            const c = getColor(n.type);
-            const headerH = 28;
-            return (
-              <g key={n.id}>
-                <rect x={n.x} y={n.y} width={n.w} height={n.h} rx="6" fill="#1a1a1a" stroke={c} strokeWidth="2.5" />
-                <rect x={n.x} y={n.y} width={n.w} height={headerH} rx="6" fill={c} fillOpacity="0.25" />
-                <line x1={n.x} y1={n.y + headerH} x2={n.x + n.w} y2={n.y + headerH} stroke={c} strokeWidth="1" opacity="0.3" />
-                <text x={n.x + 8} y={n.y + 18} fontSize="13" fontWeight="700" fill={c}>{n.type}</text>
-                {n.details.map((d, di) => (
-                  <text key={di} x={n.x + 8} y={n.y + headerH + 16 + di * 16} fontSize="11" fill="#b0b0a0">
-                    {d.length > 40 ? d.slice(0, 40) + "..." : d}
-                  </text>
-                ))}
-                {/* Input/Output dots */}
-                <circle cx={n.x} cy={n.y + n.h / 2} r="4" fill={c} opacity="0.7" />
-                <circle cx={n.x + n.w} cy={n.y + n.h / 2} r="4" fill={c} opacity="0.7" />
-              </g>
-            );
-          })}
+        <svg viewBox={`${initVB.x} ${initVB.y} ${initVB.w} ${initVB.h}`} style={{ width: "100%", height: 420, cursor: "grab", background: "#0a0a09", touchAction: "none", display: "block" }}>
+          {graphData.links.map((lk, i) => { const s = nodeMap[lk.from], t = nodeMap[lk.to]; if (!s || !t) return null; const sx = s.x + s.w, sy = s.y + s.h / 2, tx = t.x, ty = t.y + t.h / 2, cx = Math.abs(tx - sx) * 0.4 + 30; return <path key={i} d={`M${sx},${sy} C${sx + cx},${sy} ${tx - cx},${ty} ${tx},${ty}`} fill="none" stroke={getColor(s.type)} strokeWidth="3" opacity="0.6" />; })}
+          {graphData.nodes.map(n => { const c = getColor(n.type); return (
+            <g key={n.id}>
+              <rect x={n.x} y={n.y} width={n.w} height={n.h} rx="6" fill="#1a1a1a" stroke={c} strokeWidth="2.5" />
+              <rect x={n.x} y={n.y} width={n.w} height="28" rx="6" fill={c} fillOpacity="0.25" />
+              <line x1={n.x} y1={n.y + 28} x2={n.x + n.w} y2={n.y + 28} stroke={c} strokeWidth="1" opacity="0.3" />
+              <text x={n.x + 8} y={n.y + 18} fontSize="13" fontWeight="700" fill={c}>{n.type}</text>
+              {n.details.map((d, di) => <text key={di} x={n.x + 8} y={n.y + 44 + di * 16} fontSize="11" fill="#b0b0a0">{d.length > 40 ? d.slice(0, 40) + "..." : d}</text>)}
+              <circle cx={n.x} cy={n.y + n.h / 2} r="4" fill={c} opacity="0.7" />
+              <circle cx={n.x + n.w} cy={n.y + n.h / 2} r="4" fill={c} opacity="0.7" />
+            </g>
+          ); })}
         </svg>
       </div>
     );
