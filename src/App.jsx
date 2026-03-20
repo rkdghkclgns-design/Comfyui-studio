@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "./lib/supabase.js";
+import { GUIDES as GUIDES_DATA } from "./content/guides.js";
 
 // ═══════════════════════════════════════════
 // PERSISTENT STORAGE HELPER (#3)
@@ -56,7 +57,7 @@ const THEMES = {
 const LANG = {
   ko: {
     // Nav
-    navWorkflow: "워크플로우", navModels: "모델", navNodes: "노드", navTutorials: "강의", navInstall: "설치",
+    navWorkflow: "워크플로우", navModels: "모델", navNodes: "노드", navGuides: "가이드", navTutorials: "강의", navInstall: "설치",
     // Modes
     modeManual: "수동", modeAI: "AI 자동", modePrompt: "🎨 프롬프트", modeDebug: "🔍 디버거", modeImprove: "🔧 개선",
     // Generator
@@ -229,7 +230,7 @@ const LANG = {
     nodes: "노드", connections: "연결",
   },
   en: {
-    navWorkflow: "Workflow", navModels: "Models", navNodes: "Nodes", navTutorials: "Tutorials", navInstall: "Install",
+    navWorkflow: "Workflow", navModels: "Models", navNodes: "Nodes", navGuides: "Guides", navTutorials: "Tutorials", navInstall: "Install",
     modeManual: "Manual", modeAI: "AI Auto", modePrompt: "🎨 Prompt", modeDebug: "🔍 Debug", modeImprove: "🔧 Improve",
     genTitle: "Generate Workflow", genDesc: "Easily create ComfyUI workflows.",
     genReady: "Generate Ready-to-Use Workflow →", genModelRequired: "⚠ Enter model filename first",
@@ -365,7 +366,7 @@ const LANG = {
     nodes: "nodes", connections: "connections",
   },
   zh: {
-    navWorkflow: "工作流", navModels: "模型", navNodes: "节点", navTutorials: "教程", navInstall: "安装",
+    navWorkflow: "工作流", navModels: "模型", navNodes: "节点", navGuides: "指南", navTutorials: "教程", navInstall: "安装",
     modeManual: "手动", modeAI: "AI 自动", modePrompt: "🎨 提示词", modeDebug: "🔍 调试", modeImprove: "🔧 优化",
     genTitle: "生成工作流", genDesc: "轻松创建ComfyUI工作流。",
     genReady: "生成可直接使用的工作流 →", genModelRequired: "⚠ 请先输入模型文件名",
@@ -501,7 +502,7 @@ const LANG = {
     nodes: "节点", connections: "连接",
   },
   ja: {
-    navWorkflow: "ワークフロー", navModels: "モデル", navNodes: "ノード", navTutorials: "チュートリアル", navInstall: "インストール",
+    navWorkflow: "ワークフロー", navModels: "モデル", navNodes: "ノード", navGuides: "ガイド", navTutorials: "チュートリアル", navInstall: "インストール",
     modeManual: "手動", modeAI: "AI 自動", modePrompt: "🎨 プロンプト", modeDebug: "🔍 デバッグ", modeImprove: "🔧 改善",
     genTitle: "ワークフロー生成", genDesc: "簡単にComfyUIワークフローを作成しましょう。",
     genReady: "すぐ使えるワークフローを生成 →", genModelRequired: "⚠ モデルファイル名を先に入力してください",
@@ -3274,6 +3275,8 @@ export default function App() {
   const [lang, setLang] = useState("ko");
   const t = (key) => (LANG[lang] || LANG.ko)[key] || (LANG.ko)[key] || key;
   const [page, setPage] = useState("gen");
+  const [selectedGuide, setSelectedGuide] = useState(null);
+  const [legalPopup, setLegalPopup] = useState(null); // "privacy" or "terms"
   const [step, setStep] = useState(0);
   const [cat, setCat] = useState(null);
   const [config, setConfig] = useState({ model: "", sampler: "euler", scheduler: "normal", steps: 25, cfg: 7.0, width: 1024, height: 1024, seed: Math.floor(Math.random() * 2147483646) + 1, prompt: "", negPrompt: "", modelBase: "SDXL" });
@@ -3587,7 +3590,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
           </select>
           <button onClick={toggleTheme} style={{ background: T.bg3, border: `1px solid ${T.border}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontSize: 12 }}>{theme === "dark" ? "☀️" : "🌙"}</button>
           <nav style={{ display: "flex", gap: 1, background: T.bg3, borderRadius: 8, padding: 2, border: `1px solid ${T.border}` }}>
-            {[{ id: "gen", l: t("navWorkflow") }, { id: "mod", l: t("navModels") }, { id: "ref", l: t("navNodes") }, { id: "tut", l: t("navTutorials") }, { id: "inst", l: t("navInstall") }].map(n => (
+            {[{ id: "gen", l: t("navWorkflow") }, { id: "mod", l: t("navModels") }, { id: "ref", l: t("navNodes") }, { id: "guide", l: t("navGuides") }, { id: "tut", l: t("navTutorials") }, { id: "inst", l: t("navInstall") }].map(n => (
               <button key={n.id} onClick={() => { setPage(n.id); if (n.id === "gen") resetAll(); setActiveTut(null); }}
                 style={{ padding: "6px 16px", borderRadius: 100, border: "none", cursor: "pointer", background: page === n.id ? `${T.accent}18` : "transparent", color: page === n.id ? T.accent : T.text3, transition: "all .2s", fontWeight: 600, fontSize: 11, fontFamily: font }}>{n.l}</button>
             ))}
@@ -3811,6 +3814,16 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
 
             {/* ═══ SHOWCASE SECTION ═══ */}
             <ShowcaseSection theme={theme} lang={lang} />
+
+            {/* ═══ FOOTER ═══ */}
+            <div style={{ marginTop: 48, padding: "24px 0", borderTop: `1px solid ${T.border}`, textAlign: "center" }}>
+              <div style={{ display: "flex", justifyContent: "center", gap: 16, marginBottom: 12 }}>
+                <button onClick={() => setLegalPopup("privacy")} style={{ background: "none", border: "none", color: T.text4, fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>{lang === "ko" ? "개인정보처리방침" : "Privacy Policy"}</button>
+                <button onClick={() => setLegalPopup("terms")} style={{ background: "none", border: "none", color: T.text4, fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>{lang === "ko" ? "이용약관" : "Terms of Service"}</button>
+                <a href="https://github.com/rkdghkclgns-design/Comfyui-studio" target="_blank" rel="noopener noreferrer" style={{ color: T.text4, fontSize: 11, textDecoration: "underline" }}>GitHub</a>
+              </div>
+              <div style={{ fontSize: 10, color: T.text4 }}>&copy; {new Date().getFullYear()} ComfyUI Studio. All rights reserved.</div>
+            </div>
 
           </div>)}
 
@@ -4054,6 +4067,85 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
 
         {/* ═══ NODE REFERENCE (Feature 3) ═══ */}
         {page === "ref" && <NodeReference theme={theme} lang={lang} />}
+
+        {/* ═══ GUIDES (in-app) ═══ */}
+        {page === "guide" && (<div style={{ animation: "fi .35s ease" }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700, textAlign: "center", marginBottom: 6, color: T.text }}>{t("navGuides")}</h2>
+          <p style={{ textAlign: "center", fontSize: 12, color: T.text4, marginBottom: 20 }}>{lang === "ko" ? "ComfyUI를 더 잘 활용하기 위한 단계별 가이드입니다." : "Step-by-step guides to master ComfyUI."}</p>
+          {(() => { const G = typeof GUIDES_DATA !== "undefined" ? GUIDES_DATA : []; return (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+              {G.map((g, i) => (
+                <div key={g.slug} onClick={() => { setSelectedGuide(g); }} style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 12, padding: 18, cursor: "pointer", transition: "border-color .2s" }}>
+                  <span style={{ fontSize: 10, color: T.accent, fontWeight: 600, textTransform: "uppercase" }}>{g.category}</span>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: T.text, marginTop: 6, marginBottom: 6, lineHeight: 1.4 }}>{g.title}</h3>
+                  <p style={{ fontSize: 11, color: T.text3, margin: 0, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{g.description}</p>
+                  <span style={{ display: "inline-block", marginTop: 10, fontSize: 11, color: T.accent, fontWeight: 600 }}>{lang === "ko" ? "읽어보기" : "Read"} &rarr;</span>
+                </div>
+              ))}
+            </div>
+          ); })()}
+        </div>)}
+
+        {/* Guide Detail Popup */}
+        {selectedGuide && (
+          <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => setSelectedGuide(null)}>
+            <div style={{ background: T.bg2, borderRadius: 20, padding: 32, maxWidth: 800, width: "100%", maxHeight: "92vh", overflow: "auto", border: `1px solid ${T.border}` }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
+                <div>
+                  <span style={{ fontSize: 11, color: T.accent, fontWeight: 600, textTransform: "uppercase" }}>{selectedGuide.category}</span>
+                  <h2 style={{ fontSize: 22, fontWeight: 800, color: T.text, marginTop: 6, lineHeight: 1.3 }}>{selectedGuide.title}</h2>
+                  <p style={{ fontSize: 13, color: T.text2, marginTop: 4 }}>{selectedGuide.description}</p>
+                </div>
+                <button onClick={() => setSelectedGuide(null)} style={{ background: "none", border: "none", color: T.text3, fontSize: 22, cursor: "pointer", padding: 4, flexShrink: 0 }}>&times;</button>
+              </div>
+              {selectedGuide.sections?.map((s, si) => (
+                <div key={si} style={{ marginBottom: 24 }}>
+                  <h3 style={{ fontSize: 17, fontWeight: 700, color: T.text, marginBottom: 10, paddingTop: 8 }}>{s.heading}</h3>
+                  <div style={{ fontSize: 14, color: T.text2, lineHeight: 1.8, whiteSpace: "pre-line" }}>{s.content}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Legal Popup (Privacy/Terms) */}
+        {legalPopup && (
+          <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => setLegalPopup(null)}>
+            <div style={{ background: T.bg2, borderRadius: 20, padding: 32, maxWidth: 700, width: "100%", maxHeight: "90vh", overflow: "auto", border: `1px solid ${T.border}` }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
+                <h2 style={{ fontSize: 20, fontWeight: 800, color: T.text }}>{legalPopup === "privacy" ? (lang === "ko" ? "개인정보처리방침" : "Privacy Policy") : (lang === "ko" ? "이용약관" : "Terms of Service")}</h2>
+                <button onClick={() => setLegalPopup(null)} style={{ background: "none", border: "none", color: T.text3, fontSize: 22, cursor: "pointer" }}>&times;</button>
+              </div>
+              {legalPopup === "privacy" ? (
+                <div style={{ fontSize: 13, color: T.text2, lineHeight: 1.8 }}>
+                  <p style={{ color: T.text4, fontSize: 12 }}>{lang === "ko" ? "최종 수정일: 2026년 3월 20일" : "Last updated: March 20, 2026"}</p>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: T.text, marginTop: 20 }}>1. {lang === "ko" ? "수집하는 정보" : "Information We Collect"}</h3>
+                  <p>{lang === "ko" ? "ComfyUI Studio는 웹 브라우저에서 실행되는 클라이언트 측 애플리케이션으로, 별도의 서버를 통한 개인정보 수집을 하지 않습니다. 언어 설정, 테마 설정, VRAM 설정, 워크플로우 생성 기록, 튜토리얼 진행 상황이 브라우저의 로컬 저장소(localStorage)에 저장됩니다." : "ComfyUI Studio is a client-side application. We do not collect personal information through servers. Settings are stored in your browser's localStorage."}</p>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: T.text, marginTop: 20 }}>2. {lang === "ko" ? "제3자 서비스" : "Third-Party Services"}</h3>
+                  <p>{lang === "ko" ? "Google AdSense: 광고 게재를 위해 쿠키를 사용할 수 있습니다. Google Gemini API: AI 워크플로우 생성을 위해 Supabase Edge Function을 통해 호출됩니다. Supabase Auth: GitHub OAuth 로그인에 사용됩니다." : "Google AdSense may use cookies. Google Gemini API is called through Supabase Edge Function. Supabase Auth is used for GitHub OAuth login."}</p>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: T.text, marginTop: 20 }}>3. {lang === "ko" ? "쿠키 정책" : "Cookie Policy"}</h3>
+                  <p>{lang === "ko" ? "Google AdSense는 광고 게재 및 성과 측정을 위해 쿠키를 사용할 수 있습니다. 사용자는 브라우저 설정을 통해 쿠키를 관리하거나 거부할 수 있습니다." : "Google AdSense may use cookies for ad delivery. You can manage cookies through your browser settings."}</p>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: T.text, marginTop: 20 }}>4. {lang === "ko" ? "이용자의 권리" : "Your Rights"}</h3>
+                  <p>{lang === "ko" ? "브라우저 로컬 저장소의 데이터를 언제든지 삭제할 수 있습니다. 쿠키 사용을 거부할 수 있습니다. 광고 개인화를 비활성화할 수 있습니다." : "You can delete localStorage data, refuse cookies, and disable ad personalization at any time."}</p>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: T.text, marginTop: 20 }}>5. {lang === "ko" ? "문의" : "Contact"}</h3>
+                  <p>{lang === "ko" ? "개인정보 처리에 대한 문의는 GitHub 저장소의 Issues를 통해 접수할 수 있습니다." : "Contact us through GitHub Issues for privacy inquiries."}</p>
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: T.text2, lineHeight: 1.8 }}>
+                  <p style={{ color: T.text4, fontSize: 12 }}>{lang === "ko" ? "최종 수정일: 2026년 3월 20일" : "Last updated: March 20, 2026"}</p>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: T.text, marginTop: 20 }}>1. {lang === "ko" ? "서비스 개요" : "Service Overview"}</h3>
+                  <p>{lang === "ko" ? "ComfyUI Studio는 AI 이미지 생성을 위한 ComfyUI 워크플로우를 자동으로 생성해주는 무료 웹 기반 도구입니다. 본 서비스를 사용함으로써 본 약관에 동의하는 것으로 간주합니다." : "ComfyUI Studio is a free web-based tool for generating ComfyUI workflows. By using this service, you agree to these terms."}</p>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: T.text, marginTop: 20 }}>2. {lang === "ko" ? "이용 조건" : "Usage Terms"}</h3>
+                  <p>{lang === "ko" ? "서비스는 무료로 제공되며, 별도의 회원가입 없이 사용할 수 있습니다. 서비스를 이용한 불법적인 콘텐츠 생성, 서비스의 정상적인 운영을 방해하는 행위, API를 비정상적으로 과도하게 호출하는 행위는 금지됩니다." : "The service is free. Illegal content creation, service disruption, and API abuse are prohibited."}</p>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: T.text, marginTop: 20 }}>3. {lang === "ko" ? "면책 조항" : "Disclaimer"}</h3>
+                  <p>{lang === "ko" ? "서비스는 '있는 그대로' 제공되며, 어떠한 보증도 하지 않습니다. AI로 생성된 콘텐츠는 저작권, 초상권 등 법적 문제가 발생할 수 있으며, 이에 대한 책임은 사용자에게 있습니다." : "The service is provided 'as is' without warranties. Users are responsible for AI-generated content."}</p>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: T.text, marginTop: 20 }}>4. {lang === "ko" ? "문의" : "Contact"}</h3>
+                  <p>{lang === "ko" ? "약관에 대한 문의는 GitHub 저장소의 Issues를 통해 접수할 수 있습니다." : "Contact us through GitHub Issues for terms inquiries."}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ═══ TUTORIALS ═══ */}
         {page === "tut" && (<div style={{ animation: "fi .35s ease" }}>
