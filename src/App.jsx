@@ -2419,6 +2419,7 @@ function ShowcaseSection({ theme, lang }) {
   const T = THEMES[theme] || THEMES.dark;
   const isKo = lang === "ko";
   const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -2430,14 +2431,14 @@ function ShowcaseSection({ theme, lang }) {
   const TAG_OPTIONS = ["txt2img", "img2img", "controlnet", "upscale", "inpaint", "anime", "realistic", "SDXL", "Flux", "SD1.5", "LoRA", "video"];
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_ev, session) => setUser(session?.user ?? null));
+    supabase.auth.getSession().then(({ data: { session } }) => { setUser(session?.user ?? null); setAuthLoading(false); });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_ev, session) => { setUser(session?.user ?? null); setAuthLoading(false); });
     return () => subscription.unsubscribe();
   }, []);
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from("showcase_posts").select("*").order("created_at", { ascending: false }).limit(20);
+    const { data } = await supabase.from("showcase_posts").select("*").order("created_at", { ascending: false }).limit(30);
     setPosts(data || []);
     setLoading(false);
   }, []);
@@ -2447,6 +2448,67 @@ function ShowcaseSection({ theme, lang }) {
     await supabase.auth.signInWithOAuth({ provider: "github", options: { redirectTo: window.location.origin } });
   };
   const handleLogout = async () => { await supabase.auth.signOut(); setUser(null); };
+
+  // Robust workflow parser — handles ComfyUI API format (object with numbered keys) and array format
+  const parseWorkflow = (jsonStr) => {
+    try {
+      const raw = JSON.parse(jsonStr);
+      let nodes = [];
+      if (Array.isArray(raw)) { nodes = raw; }
+      else if (typeof raw === "object" && raw !== null) {
+        // Check if it's {nodes: [...], links: [...]} format (ComfyUI web format)
+        if (Array.isArray(raw.nodes)) { nodes = raw.nodes.map(n => ({ class_type: n.type, inputs: n.widgets_values ? {} : {}, _widgets: n.widgets_values, _type: n.type })); }
+        // API format: {"1": {class_type, inputs}, "2": ...}
+        else { nodes = Object.values(raw); }
+      }
+      const info = { model: null, steps: null, cfg: null, sampler: null, scheduler: null, width: null, height: null, seed: null, positive: null, negative: null, nodeCount: nodes.length, detectedTags: [] };
+      for (const n of nodes) {
+        const ct = n.class_type || n._type || n.type || "";
+        const inp = n.inputs || {};
+        // Parse widgets_values for web format
+        if (ct.includes("CheckpointLoader")) info.model = inp.ckpt_name || null;
+        if (ct === "KSampler" || ct === "KSamplerAdvanced") { info.steps = inp.steps; info.cfg = inp.cfg; info.sampler = inp.sampler_name || inp.sampler; info.scheduler = inp.scheduler; info.seed = inp.seed; }
+        if (ct === "EmptyLatentImage" || ct === "EmptySD3LatentImage") { info.width = inp.width; info.height = inp.height; }
+        if (ct === "CLIPTextEncode") { const txt = typeof inp.text === "string" ? inp.text : ""; if (txt && !info.positive) info.positive = txt; else if (txt && !info.negative) info.negative = txt; }
+        // Detect tags from node types
+        if (ct.includes("ControlNet") || ct.includes("controlnet")) info.detectedTags.push("controlnet");
+        if (ct.includes("Upscale") || ct.includes("upscale")) info.detectedTags.push("upscale");
+        if (ct.includes("Inpaint") || ct.includes("inpaint")) info.detectedTags.push("inpaint");
+        if (ct.includes("LoRA") || ct.includes("Lora")) info.detectedTags.push("LoRA");
+        if (ct.includes("Video") || ct.includes("video") || ct.includes("AnimateDiff") || ct.includes("Hunyuan")) info.detectedTags.push("video");
+        if (ct.includes("VAEEncode") && !ct.includes("Inpaint")) info.detectedTags.push("img2img");
+      }
+      // Detect model-based tags
+      const modelLower = (info.model || "").toLowerCase();
+      if (modelLower.includes("xl") || modelLower.includes("sdxl")) info.detectedTags.push("SDXL");
+      else if (modelLower.includes("flux")) info.detectedTags.push("Flux");
+      else if (modelLower.includes("1.5") || modelLower.includes("15") || modelLower.includes("sd1")) info.detectedTags.push("SD1.5");
+      if (modelLower.includes("anime") || modelLower.includes("counterfeit") || modelLower.includes("pastel")) info.detectedTags.push("anime");
+      if (modelLower.includes("real") || modelLower.includes("photo")) info.detectedTags.push("realistic");
+      // If no img2img detected, it's likely txt2img
+      if (!info.detectedTags.includes("img2img")) info.detectedTags.push("txt2img");
+      info.detectedTags = [...new Set(info.detectedTags)];
+      return info;
+    } catch { return null; }
+  };
+
+  const wfPreview = formData.workflow_json.trim() ? parseWorkflow(formData.workflow_json) : null;
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const json = ev.target.result;
+      setFormData(p => ({ ...p, workflow_json: json }));
+      // Auto-detect tags from uploaded file
+      const info = parseWorkflow(json);
+      if (info?.detectedTags?.length) {
+        setFormData(p => ({ ...p, workflow_json: json, tags: [...new Set([...p.tags, ...info.detectedTags])] }));
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -2479,35 +2541,21 @@ function ShowcaseSection({ theme, lang }) {
     return `${Math.floor(h / 24)}d`;
   };
 
-  const inputS = { width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${T.border2}`, background: T.bg3, color: T.text, fontSize: 13, fontFamily: "'DM Sans',sans-serif", outline: "none", boxSizing: "border-box" };
+  const inputS = { width: "100%", padding: "12px 16px", borderRadius: 10, border: `1px solid ${T.border2}`, background: T.bg3, color: T.text, fontSize: 14, fontFamily: "'DM Sans',sans-serif", outline: "none", boxSizing: "border-box" };
 
-  // Parse workflow JSON to extract preview info
-  const parseWorkflow = (jsonStr) => {
-    try {
-      const wf = JSON.parse(jsonStr);
-      const nodes = Object.values(wf);
-      const info = { model: null, steps: null, cfg: null, sampler: null, scheduler: null, width: null, height: null, seed: null, positive: null, negative: null, nodeCount: nodes.length };
-      for (const n of nodes) {
-        const ct = n.class_type || "";
-        const inp = n.inputs || {};
-        if (ct.includes("CheckpointLoader")) info.model = inp.ckpt_name || null;
-        if (ct === "KSampler" || ct === "KSamplerAdvanced") { info.steps = inp.steps; info.cfg = inp.cfg; info.sampler = inp.sampler_name; info.scheduler = inp.scheduler; info.seed = inp.seed; }
-        if (ct === "EmptyLatentImage" || ct === "EmptySD3LatentImage") { info.width = inp.width; info.height = inp.height; }
-        if (ct === "CLIPTextEncode") { const txt = inp.text || ""; if (!info.positive) info.positive = txt; else if (!info.negative) info.negative = txt; }
-      }
-      return info;
-    } catch { return null; }
-  };
+  // GitHub login required gate
+  if (authLoading) return <div style={{ marginTop: 48, padding: "32px 0", borderTop: `1px solid ${T.border}`, textAlign: "center", color: T.text3, fontSize: 12 }}>Loading...</div>;
 
-  const wfPreview = formData.workflow_json.trim() ? parseWorkflow(formData.workflow_json) : null;
-
-  const handleFileUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => { setFormData(p => ({ ...p, workflow_json: ev.target.result })); };
-    reader.readAsText(file);
-  };
+  if (!user) return (
+    <div style={{ marginTop: 48, padding: "48px 0", borderTop: `1px solid ${T.border}`, textAlign: "center" }}>
+      <h2 style={{ fontSize: 18, fontWeight: 700, color: T.text, marginBottom: 8 }}>{isKo ? "커뮤니티 Showcase" : "Community Showcase"}</h2>
+      <p style={{ fontSize: 13, color: T.text2, marginBottom: 24 }}>{isKo ? "워크플로우를 공유하고 탐색하려면 GitHub 로그인이 필요합니다." : "Login with GitHub to share and explore workflows."}</p>
+      <button onClick={handleLogin} style={{ padding: "10px 28px", borderRadius: 10, border: "none", background: "#24292f", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="white"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub Login
+      </button>
+    </div>
+  );
 
   return (
     <div style={{ marginTop: 48, padding: "32px 0", borderTop: `1px solid ${T.border}` }}>
@@ -2517,44 +2565,36 @@ function ShowcaseSection({ theme, lang }) {
           <p style={{ fontSize: 12, color: T.text4, margin: 0 }}>{isKo ? "나의 워크플로우를 공유하고 다른 사람의 워크플로우를 탐색하세요." : "Share your workflows and explore others."}</p>
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          {user ? (<>
-            <img src={user.user_metadata?.avatar_url} alt="" style={{ width: 22, height: 22, borderRadius: "50%" }} />
-            <span style={{ fontSize: 11, color: T.text2 }}>{user.user_metadata?.user_name}</span>
-            <button onClick={() => setShowForm(true)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: T.accent2, color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>+ {isKo ? "공유" : "Share"}</button>
-            <button onClick={handleLogout} style={{ padding: "6px 10px", borderRadius: 8, border: `1px solid ${T.border}`, background: "transparent", color: T.text3, fontSize: 10, cursor: "pointer" }}>Logout</button>
-          </>) : (
-            <button onClick={handleLogin} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#24292f", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="white"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-              GitHub Login
-            </button>
-          )}
+          <img src={user.user_metadata?.avatar_url} alt="" style={{ width: 22, height: 22, borderRadius: "50%" }} />
+          <span style={{ fontSize: 11, color: T.text2 }}>{user.user_metadata?.user_name}</span>
+          <button onClick={() => setShowForm(true)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: T.accent2, color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>+ {isKo ? "공유" : "Share"}</button>
+          <button onClick={handleLogout} style={{ padding: "6px 10px", borderRadius: 8, border: `1px solid ${T.border}`, background: "transparent", color: T.text3, fontSize: 10, cursor: "pointer" }}>Logout</button>
         </div>
       </div>
 
-      {/* Post Form Modal */}
+      {/* Post Form Modal — larger */}
       {showForm && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => setShowForm(false)}>
-          <div style={{ background: T.bg2, borderRadius: 16, padding: 28, maxWidth: 560, width: "100%", maxHeight: "85vh", overflow: "auto", border: `1px solid ${T.border}` }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20, color: T.text }}>{isKo ? "워크플로우 공유" : "Share Workflow"}</h3>
-            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => setShowForm(false)}>
+          <div style={{ background: T.bg2, borderRadius: 20, padding: 32, maxWidth: 720, width: "100%", maxHeight: "92vh", overflow: "auto", border: `1px solid ${T.border}` }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24, color: T.text }}>{isKo ? "워크플로우 공유" : "Share Workflow"}</h3>
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <input value={formData.title} onChange={e => setFormData(p => ({ ...p, title: e.target.value }))} placeholder={isKo ? "제목" : "Title"} maxLength={100} style={inputS} />
-              <textarea value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} placeholder={isKo ? "설명 (선택)" : "Description (optional)"} rows={2} maxLength={500} style={{ ...inputS, resize: "vertical" }} />
-              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-                <label style={{ flex: 1, padding: "8px 14px", borderRadius: 8, border: `1px dashed ${T.border2}`, background: T.bg3, color: T.text2, fontSize: 11, textAlign: "center", cursor: "pointer" }}>
-                  {isKo ? "JSON 파일 첨부" : "Upload JSON file"}
+              <textarea value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} placeholder={isKo ? "설명 (선택)" : "Description (optional)"} rows={3} maxLength={500} style={{ ...inputS, resize: "vertical" }} />
+              <div>
+                <label style={{ display: "block", padding: "12px 16px", borderRadius: 10, border: `2px dashed ${T.border2}`, background: T.bg3, color: T.text2, fontSize: 13, textAlign: "center", cursor: "pointer", marginBottom: 8 }}>
+                  {isKo ? "JSON 파일 첨부 (클릭하여 선택)" : "Upload JSON file (click to select)"}
                   <input type="file" accept=".json,application/json" onChange={handleFileUpload} style={{ display: "none" }} />
                 </label>
-                <span style={{ fontSize: 10, color: T.text4 }}>{isKo ? "또는 아래에 직접 입력" : "or paste below"}</span>
+                <textarea value={formData.workflow_json} onChange={e => setFormData(p => ({ ...p, workflow_json: e.target.value }))} placeholder={isKo ? "또는 여기에 Workflow JSON을 직접 붙여넣기" : "Or paste Workflow JSON here"} rows={8} style={{ ...inputS, fontFamily: "'JetBrains Mono',monospace", fontSize: 12, resize: "vertical", lineHeight: 1.6 }} />
               </div>
-              <textarea value={formData.workflow_json} onChange={e => setFormData(p => ({ ...p, workflow_json: e.target.value }))} placeholder="Workflow JSON" rows={4} style={{ ...inputS, fontFamily: "'JetBrains Mono',monospace", fontSize: 11, resize: "vertical" }} />
               {/* Workflow Preview */}
               {wfPreview && (
-                <div style={{ marginTop: 8, padding: 14, background: T.bg, borderRadius: 10, border: `1px solid ${T.accent}30` }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: T.accent, marginBottom: 10 }}>{isKo ? "워크플로우 미리보기" : "Workflow Preview"}</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    {wfPreview.model && <div style={{ gridColumn: "1 / -1", padding: "8px 12px", background: T.bg2, borderRadius: 8, border: `1px solid ${T.border}` }}>
-                      <span style={{ fontSize: 10, color: T.text4 }}>{isKo ? "모델" : "Model"}</span>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: T.text, marginTop: 2, wordBreak: "break-all" }}>{wfPreview.model}</div>
+                <div style={{ padding: 18, background: T.bg, borderRadius: 12, border: `1px solid ${T.accent}30` }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: T.accent, marginBottom: 14 }}>{isKo ? "워크플로우 미리보기" : "Workflow Preview"}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+                    {wfPreview.model && <div style={{ gridColumn: "1 / -1", padding: "10px 14px", background: T.bg2, borderRadius: 10, border: `1px solid ${T.border}` }}>
+                      <span style={{ fontSize: 11, color: T.text4 }}>{isKo ? "모델" : "Model"}</span>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: T.text, marginTop: 3, wordBreak: "break-all" }}>{wfPreview.model}</div>
                     </div>}
                     {[
                       [isKo ? "스텝" : "Steps", wfPreview.steps],
@@ -2564,89 +2604,96 @@ function ShowcaseSection({ theme, lang }) {
                       [isKo ? "해상도" : "Resolution", wfPreview.width && wfPreview.height ? `${wfPreview.width} x ${wfPreview.height}` : null],
                       ["Seed", wfPreview.seed],
                     ].filter(([, v]) => v != null).map(([label, val]) => (
-                      <div key={label} style={{ padding: "6px 10px", background: T.bg2, borderRadius: 8, border: `1px solid ${T.border}` }}>
-                        <span style={{ fontSize: 9, color: T.text4 }}>{label}</span>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: T.text, marginTop: 1 }}>{String(val)}</div>
+                      <div key={label} style={{ padding: "8px 12px", background: T.bg2, borderRadius: 10, border: `1px solid ${T.border}` }}>
+                        <span style={{ fontSize: 10, color: T.text4 }}>{label}</span>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginTop: 2 }}>{String(val)}</div>
                       </div>
                     ))}
                   </div>
-                  {wfPreview.positive && <div style={{ marginTop: 8, padding: "8px 10px", background: T.bg2, borderRadius: 8, border: `1px solid ${T.border}` }}>
-                    <span style={{ fontSize: 9, color: T.text4 }}>{isKo ? "프롬프트" : "Prompt"}</span>
-                    <div style={{ fontSize: 10, color: T.text2, marginTop: 2, lineHeight: 1.5, maxHeight: 60, overflow: "hidden" }}>{wfPreview.positive}</div>
+                  {wfPreview.positive && <div style={{ marginTop: 10, padding: "10px 14px", background: T.bg2, borderRadius: 10, border: `1px solid ${T.border}` }}>
+                    <span style={{ fontSize: 10, color: T.text4 }}>{isKo ? "프롬프트" : "Prompt"}</span>
+                    <div style={{ fontSize: 12, color: T.text2, marginTop: 4, lineHeight: 1.6 }}>{wfPreview.positive}</div>
                   </div>}
-                  <div style={{ marginTop: 6, fontSize: 9, color: T.text4 }}>{isKo ? `노드 ${wfPreview.nodeCount}개 감지` : `${wfPreview.nodeCount} nodes detected`}</div>
+                  {wfPreview.negative && <div style={{ marginTop: 6, padding: "10px 14px", background: T.bg2, borderRadius: 10, border: `1px solid #e5555520` }}>
+                    <span style={{ fontSize: 10, color: "#e55" }}>Negative</span>
+                    <div style={{ fontSize: 12, color: T.text3, marginTop: 4, lineHeight: 1.6 }}>{wfPreview.negative}</div>
+                  </div>}
+                  <div style={{ marginTop: 8, fontSize: 11, color: T.text4 }}>{isKo ? `노드 ${wfPreview.nodeCount}개 감지` : `${wfPreview.nodeCount} nodes detected`}</div>
                 </div>
               )}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                {TAG_OPTIONS.map(tag => (
-                  <button key={tag} type="button" onClick={() => setFormData(p => ({ ...p, tags: p.tags.includes(tag) ? p.tags.filter(t => t !== tag) : [...p.tags, tag] }))} style={{
-                    padding: "3px 10px", borderRadius: 16, fontSize: 10, cursor: "pointer",
-                    border: `1px solid ${formData.tags.includes(tag) ? T.accent : T.border}`,
-                    background: formData.tags.includes(tag) ? `${T.accent}20` : "transparent",
-                    color: formData.tags.includes(tag) ? T.accent : T.text3,
-                  }}>{tag}</button>
-                ))}
+              <div>
+                <div style={{ fontSize: 12, color: T.text2, marginBottom: 8 }}>{isKo ? "태그" : "Tags"}{wfPreview?.detectedTags?.length > 0 && !formData.tags.length ? ` (${isKo ? "파일에서 자동 감지됨" : "auto-detected from file"})` : ""}</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {TAG_OPTIONS.map(tag => (
+                    <button key={tag} type="button" onClick={() => setFormData(p => ({ ...p, tags: p.tags.includes(tag) ? p.tags.filter(t => t !== tag) : [...p.tags, tag] }))} style={{
+                      padding: "5px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: 500,
+                      border: `1px solid ${formData.tags.includes(tag) ? T.accent : T.border}`,
+                      background: formData.tags.includes(tag) ? `${T.accent}20` : "transparent",
+                      color: formData.tags.includes(tag) ? T.accent : T.text3,
+                    }}>{tag}</button>
+                  ))}
+                </div>
               </div>
-              {error && <p style={{ color: "#e55", fontSize: 12, margin: 0 }}>{error}</p>}
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                <button type="button" onClick={() => setShowForm(false)} style={{ padding: "8px 16px", borderRadius: 8, border: `1px solid ${T.border}`, background: "transparent", color: T.text2, cursor: "pointer", fontSize: 12 }}>{isKo ? "취소" : "Cancel"}</button>
-                <button type="submit" disabled={submitting} style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: T.accent2, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700, opacity: submitting ? 0.5 : 1 }}>{submitting ? "..." : isKo ? "게시" : "Post"}</button>
+              {error && <p style={{ color: "#e55", fontSize: 13, margin: 0 }}>{error}</p>}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
+                <button type="button" onClick={() => setShowForm(false)} style={{ padding: "10px 24px", borderRadius: 10, border: `1px solid ${T.border}`, background: "transparent", color: T.text2, cursor: "pointer", fontSize: 13 }}>{isKo ? "취소" : "Cancel"}</button>
+                <button type="submit" disabled={submitting} style={{ padding: "10px 28px", borderRadius: 10, border: "none", background: T.accent2, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700, opacity: submitting ? 0.5 : 1 }}>{submitting ? "..." : isKo ? "게시" : "Post"}</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Post Detail Modal */}
+      {/* Post Detail Modal — larger */}
       {selectedPost && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => setSelectedPost(null)}>
-          <div style={{ background: T.bg2, borderRadius: 16, padding: 28, maxWidth: 640, width: "100%", maxHeight: "85vh", overflow: "auto", border: `1px solid ${T.border}` }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => setSelectedPost(null)}>
+          <div style={{ background: T.bg2, borderRadius: 20, padding: 32, maxWidth: 800, width: "100%", maxHeight: "92vh", overflow: "auto", border: `1px solid ${T.border}` }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
               <div>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 6 }}>{selectedPost.title}</h3>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  {selectedPost.avatar_url && <img src={selectedPost.avatar_url} alt="" style={{ width: 18, height: 18, borderRadius: "50%" }} />}
-                  <span style={{ fontSize: 11, color: T.text2 }}>{selectedPost.username}</span>
-                  <span style={{ fontSize: 10, color: T.text4 }}>{timeAgo(selectedPost.created_at)}</span>
+                <h3 style={{ fontSize: 20, fontWeight: 700, color: T.text, marginBottom: 8 }}>{selectedPost.title}</h3>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {selectedPost.avatar_url && <img src={selectedPost.avatar_url} alt="" style={{ width: 22, height: 22, borderRadius: "50%" }} />}
+                  <span style={{ fontSize: 13, color: T.text2 }}>{selectedPost.username}</span>
+                  <span style={{ fontSize: 12, color: T.text4 }}>{timeAgo(selectedPost.created_at)}</span>
                 </div>
               </div>
-              <button onClick={() => setSelectedPost(null)} style={{ background: "none", border: "none", color: T.text3, fontSize: 18, cursor: "pointer" }}>&times;</button>
+              <button onClick={() => setSelectedPost(null)} style={{ background: "none", border: "none", color: T.text3, fontSize: 22, cursor: "pointer", padding: 4 }}>&times;</button>
             </div>
-            {selectedPost.description && <p style={{ fontSize: 13, color: T.text2, marginBottom: 14, lineHeight: 1.6 }}>{selectedPost.description}</p>}
-            {selectedPost.tags?.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 14 }}>{selectedPost.tags.map(t => <span key={t} style={{ padding: "2px 8px", borderRadius: 16, fontSize: 10, background: `${T.accent}15`, color: T.accent, border: `1px solid ${T.accent}30` }}>{t}</span>)}</div>}
+            {selectedPost.description && <p style={{ fontSize: 14, color: T.text2, marginBottom: 16, lineHeight: 1.7 }}>{selectedPost.description}</p>}
+            {selectedPost.tags?.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>{selectedPost.tags.map(t => <span key={t} style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, background: `${T.accent}15`, color: T.accent, border: `1px solid ${T.accent}30` }}>{t}</span>)}</div>}
             {/* Workflow Info Preview */}
             {(() => { const info = parseWorkflow(selectedPost.workflow_json); if (!info) return null; return (
-              <div style={{ marginBottom: 14, padding: 14, background: T.bg, borderRadius: 10, border: `1px solid ${T.accent}30` }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: T.accent, marginBottom: 10 }}>{isKo ? "워크플로우 정보" : "Workflow Info"}</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                  {info.model && <div style={{ gridColumn: "1 / -1", padding: "6px 10px", background: T.bg2, borderRadius: 8, border: `1px solid ${T.border}` }}>
-                    <span style={{ fontSize: 9, color: T.text4 }}>{isKo ? "모델" : "Model"}</span>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: T.text, marginTop: 1, wordBreak: "break-all" }}>{info.model}</div>
+              <div style={{ marginBottom: 16, padding: 18, background: T.bg, borderRadius: 12, border: `1px solid ${T.accent}30` }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: T.accent, marginBottom: 14 }}>{isKo ? "워크플로우 정보" : "Workflow Info"}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8 }}>
+                  {info.model && <div style={{ gridColumn: "1 / -1", padding: "8px 12px", background: T.bg2, borderRadius: 10, border: `1px solid ${T.border}` }}>
+                    <span style={{ fontSize: 10, color: T.text4 }}>{isKo ? "모델" : "Model"}</span>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: T.text, marginTop: 2, wordBreak: "break-all" }}>{info.model}</div>
                   </div>}
                   {[[isKo ? "스텝" : "Steps", info.steps], ["CFG", info.cfg], [isKo ? "샘플러" : "Sampler", info.sampler], [isKo ? "스케줄러" : "Scheduler", info.scheduler], [isKo ? "해상도" : "Resolution", info.width && info.height ? `${info.width} x ${info.height}` : null], ["Seed", info.seed]].filter(([, v]) => v != null).map(([l, v]) => (
-                    <div key={l} style={{ padding: "5px 10px", background: T.bg2, borderRadius: 8, border: `1px solid ${T.border}` }}>
-                      <span style={{ fontSize: 9, color: T.text4 }}>{l}</span>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: T.text, marginTop: 1 }}>{String(v)}</div>
+                    <div key={l} style={{ padding: "6px 12px", background: T.bg2, borderRadius: 10, border: `1px solid ${T.border}` }}>
+                      <span style={{ fontSize: 10, color: T.text4 }}>{l}</span>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginTop: 2 }}>{String(v)}</div>
                     </div>
                   ))}
                 </div>
-                {info.positive && <div style={{ marginTop: 6, padding: "6px 10px", background: T.bg2, borderRadius: 8, border: `1px solid ${T.border}` }}>
-                  <span style={{ fontSize: 9, color: T.text4 }}>{isKo ? "프롬프트" : "Prompt"}</span>
-                  <div style={{ fontSize: 10, color: T.text2, marginTop: 2, lineHeight: 1.5 }}>{info.positive}</div>
+                {info.positive && <div style={{ marginTop: 8, padding: "8px 12px", background: T.bg2, borderRadius: 10, border: `1px solid ${T.border}` }}>
+                  <span style={{ fontSize: 10, color: T.text4 }}>{isKo ? "프롬프트" : "Prompt"}</span>
+                  <div style={{ fontSize: 12, color: T.text2, marginTop: 3, lineHeight: 1.6 }}>{info.positive}</div>
                 </div>}
-                {info.negative && <div style={{ marginTop: 4, padding: "6px 10px", background: T.bg2, borderRadius: 8, border: `1px solid #e5555530` }}>
-                  <span style={{ fontSize: 9, color: "#e55" }}>Negative</span>
-                  <div style={{ fontSize: 10, color: T.text3, marginTop: 2, lineHeight: 1.5 }}>{info.negative}</div>
+                {info.negative && <div style={{ marginTop: 6, padding: "8px 12px", background: T.bg2, borderRadius: 10, border: `1px solid #e5555520` }}>
+                  <span style={{ fontSize: 10, color: "#e55" }}>Negative</span>
+                  <div style={{ fontSize: 12, color: T.text3, marginTop: 3, lineHeight: 1.6 }}>{info.negative}</div>
                 </div>}
-                <div style={{ marginTop: 4, fontSize: 9, color: T.text4 }}>{isKo ? `노드 ${info.nodeCount}개` : `${info.nodeCount} nodes`}</div>
+                <div style={{ marginTop: 6, fontSize: 10, color: T.text4 }}>{isKo ? `노드 ${info.nodeCount}개` : `${info.nodeCount} nodes`}</div>
               </div>
             ); })()}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-              <span style={{ fontSize: 12, color: T.text2, fontWeight: 600 }}>Workflow JSON</span>
-              <button onClick={() => copyJSON(selectedPost.workflow_json)} style={{ padding: "3px 10px", borderRadius: 6, border: `1px solid ${T.border}`, background: T.bg3, color: T.text2, fontSize: 11, cursor: "pointer" }}>{isKo ? "복사" : "Copy"}</button>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ fontSize: 13, color: T.text2, fontWeight: 600 }}>Workflow JSON</span>
+              <button onClick={() => copyJSON(selectedPost.workflow_json)} style={{ padding: "5px 14px", borderRadius: 8, border: `1px solid ${T.border}`, background: T.bg3, color: T.text2, fontSize: 12, cursor: "pointer" }}>{isKo ? "복사" : "Copy"}</button>
             </div>
-            <pre style={{ background: T.bg, padding: 14, borderRadius: 10, border: `1px solid ${T.border}`, fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: T.text2, overflow: "auto", maxHeight: 250, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{selectedPost.workflow_json}</pre>
-            {user && user.id === selectedPost.user_id && <button onClick={() => handleDelete(selectedPost.id)} style={{ marginTop: 14, padding: "6px 14px", borderRadius: 8, border: `1px solid #e55`, background: "transparent", color: "#e55", fontSize: 11, cursor: "pointer" }}>{isKo ? "삭제" : "Delete"}</button>}
+            <pre style={{ background: T.bg, padding: 16, borderRadius: 12, border: `1px solid ${T.border}`, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: T.text2, overflow: "auto", maxHeight: 300, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{selectedPost.workflow_json}</pre>
+            {user && user.id === selectedPost.user_id && <button onClick={() => handleDelete(selectedPost.id)} style={{ marginTop: 16, padding: "8px 18px", borderRadius: 10, border: `1px solid #e55`, background: "transparent", color: "#e55", fontSize: 12, cursor: "pointer" }}>{isKo ? "삭제" : "Delete"}</button>}
           </div>
         </div>
       )}
