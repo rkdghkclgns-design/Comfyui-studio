@@ -2453,7 +2453,7 @@ function ShowcaseSection({ theme, lang }) {
   const parseWorkflow = (jsonStr) => {
     try {
       const raw = JSON.parse(jsonStr);
-      const info = { model: null, steps: null, cfg: null, sampler: null, scheduler: null, width: null, height: null, seed: null, positive: null, negative: null, nodeCount: 0, detectedTags: [] };
+      const info = { model: null, steps: null, cfg: null, sampler: null, scheduler: null, width: null, height: null, seed: null, positive: null, negative: null, nodeCount: 0, detectedTags: [], _nodes: [] };
 
       // Detect format and extract nodes
       let isWebFormat = false;
@@ -2471,6 +2471,7 @@ function ShowcaseSection({ theme, lang }) {
       }
 
       info.nodeCount = nodeList.length;
+      info._nodes = nodeList.map(n => n.class_type || n.type || "Unknown").filter(Boolean);
 
       for (const n of nodeList) {
         const ct = n.class_type || n.type || "";
@@ -2609,6 +2610,64 @@ function ShowcaseSection({ theme, lang }) {
             <div style={{ fontSize: 12, color: T.text3, lineHeight: 1.7, ...mono, background: T.bg3, padding: "10px 14px", borderRadius: 8, whiteSpace: "pre-wrap", maxHeight: 80, overflow: "auto" }}>{info.negative}</div>
           </div>
         )}
+
+        {/* Spec Panel - auto-detected from workflow */}
+        {(() => {
+          const modelLower = (info.model || "").toLowerCase();
+          let modelBase = "SDXL";
+          if (modelLower.includes("flux")) modelBase = "Flux";
+          else if (modelLower.includes("1.5") || modelLower.includes("sd1") || modelLower.includes("15")) modelBase = "SD15";
+          else if (modelLower.includes("wan")) modelBase = "Wan";
+          else if (modelLower.includes("hunyuan")) modelBase = "Hunyuan";
+          const category = info.detectedTags?.includes("video") ? "t2v" : info.detectedTags?.includes("controlnet") ? "controlnet" : info.detectedTags?.includes("LoRA") ? "lora" : "t2i";
+          const spec = getSpec(category, { width: info.width || 1024, height: info.height || 1024, modelBase }, null, lang);
+          return (
+            <div style={{ marginTop: 12, background: `${spec.color}08`, border: `1px solid ${spec.color}22`, borderRadius: 14, padding: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: spec.color }} />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: spec.color }}>{spec.level} {isKo ? "권장 사양" : "Recommended Spec"}</span>
+                </div>
+                <span style={{ fontSize: 10, color: T.text4, padding: "3px 10px", background: T.bg3, borderRadius: 5 }}>{spec.budget}</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 10 }}>
+                {[
+                  ["🎮", "GPU", spec.gpu], ["💾", "VRAM", spec.vram], ["🧠", "RAM", spec.ram],
+                  ["⚡", "CPU", spec.cpu], ["💿", "SSD", spec.storage], ["⏱️", isKo ? "속도" : "Speed", spec.time],
+                ].map(([ic, lb, vl]) => (
+                  <div key={lb} style={{ background: T.bg2, borderRadius: 8, padding: "8px 10px", border: `1px solid ${T.border}` }}>
+                    <div style={{ fontSize: 9, color: T.text4 }}>{ic} {lb}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: T.text, marginTop: 2, ...mono }}>{vl}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 10, color: spec.color, fontWeight: 500 }}>{isKo ? "예상" : "Est."} VRAM: {spec.estimatedVram} GB</div>
+              {spec.tips.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
+                  {spec.tips.slice(0, 3).map((tip, i) => <span key={i} style={{ padding: "2px 8px", borderRadius: 12, fontSize: 9, background: `${spec.color}12`, color: spec.color, border: `1px solid ${spec.color}20` }}>{tip}</span>)}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Node Graph Visualization */}
+        {info._nodes && info._nodes.length > 0 && (() => {
+          const NODE_COLORS = { "CheckpointLoaderSimple": "#2dd4a8", "CLIPTextEncode": "#fbbf24", "KSampler": "#f472b6", "VAEDecode": "#fb923c", "SaveImage": "#60a5fa", "EmptyLatentImage": "#22d3ee", "LoraLoader": "#a78bfa", "ControlNetApply": "#34d399", "LoadImage": "#818cf8", "VAEEncode": "#fb923c" };
+          const getColor = (t) => { for (const [k, v] of Object.entries(NODE_COLORS)) { if (t.includes(k)) return v; } return "#888"; };
+          return (
+            <div style={{ marginTop: 12, background: T.bg2, borderRadius: 14, border: `1px solid ${T.border}`, padding: 16, overflow: "auto" }}>
+              <div style={{ fontSize: 10, color: T.text4, marginBottom: 10, fontWeight: 600 }}>{isKo ? "워크플로우 노드 구조" : "Workflow Node Structure"}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, minHeight: 40 }}>
+                {info._nodes.map((nd, i) => (
+                  <div key={i} style={{ padding: "6px 12px", borderRadius: 8, border: `2px solid ${getColor(nd)}`, background: `${getColor(nd)}10`, fontSize: 10, fontWeight: 600, color: getColor(nd), whiteSpace: "nowrap" }}>
+                    {nd}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   };
@@ -2650,6 +2709,18 @@ function ShowcaseSection({ theme, lang }) {
   };
 
   const copyJSON = (json) => { navigator.clipboard.writeText(json).catch(() => {}); };
+  const downloadJSON = (json, title) => {
+    try {
+      const pretty = JSON.stringify(JSON.parse(json), null, 2);
+      const blob = new Blob([pretty], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(title || "workflow").replace(/[^a-zA-Z0-9가-힣]/g, "_")}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {}
+  };
 
   const timeAgo = (d) => {
     const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
@@ -2754,7 +2825,7 @@ function ShowcaseSection({ theme, lang }) {
             <details style={{ marginTop: 8 }}>
               <summary style={{ cursor: "pointer", fontSize: 13, color: T.text2, fontWeight: 600, padding: "8px 0", display: "flex", alignItems: "center", gap: 8, userSelect: "none" }}>
                 <span>Workflow JSON</span>
-                <button onClick={(e) => { e.preventDefault(); copyJSON(selectedPost.workflow_json); }} style={{ padding: "4px 12px", borderRadius: 6, border: `1px solid ${T.border}`, background: T.bg3, color: T.text2, fontSize: 11, cursor: "pointer", marginLeft: "auto" }}>{isKo ? "복사" : "Copy"}</button>
+                <button onClick={(e) => { e.preventDefault(); downloadJSON(selectedPost.workflow_json, selectedPost.title); }} style={{ padding: "4px 12px", borderRadius: 6, border: `1px solid ${T.accent}`, background: `${T.accent}15`, color: T.accent, fontSize: 11, fontWeight: 600, cursor: "pointer", marginLeft: "auto" }}>{isKo ? "⬇ JSON 다운로드" : "⬇ Download JSON"}</button>
               </summary>
               <pre style={{ background: T.bg, padding: 16, borderRadius: 12, border: `1px solid ${T.border}`, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: T.text2, overflow: "auto", maxHeight: 400, whiteSpace: "pre-wrap", wordBreak: "break-all", marginTop: 8 }}>{(() => { try { return JSON.stringify(JSON.parse(selectedPost.workflow_json), null, 2); } catch { return selectedPost.workflow_json; } })()}</pre>
             </details>
@@ -2782,6 +2853,18 @@ function ShowcaseSection({ theme, lang }) {
               </div>
               <h4 style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 4, lineHeight: 1.3 }}>{post.title}</h4>
               {post.description && <p style={{ fontSize: 11, color: T.text3, margin: "0 0 8px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{post.description}</p>}
+              {/* Card mini preview */}
+              {(() => { const pi = parseWorkflow(post.workflow_json); if (!pi) return null; return (
+                <div style={{ marginBottom: 8, padding: "8px 10px", background: T.bg, borderRadius: 8, border: `1px solid ${T.border}` }}>
+                  {pi.model && <div style={{ fontSize: 10, fontWeight: 600, color: T.text, marginBottom: 4, fontFamily: "'JetBrains Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pi.model}</div>}
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {pi.steps != null && <span style={{ fontSize: 9, color: T.text4 }}>Steps:{pi.steps}</span>}
+                    {pi.cfg != null && <span style={{ fontSize: 9, color: T.text4 }}>CFG:{pi.cfg}</span>}
+                    {pi.width && pi.height && <span style={{ fontSize: 9, color: T.text4 }}>{pi.width}x{pi.height}</span>}
+                    <span style={{ fontSize: 9, color: T.text4 }}>{pi.nodeCount}{isKo ? "노드" : " nodes"}</span>
+                  </div>
+                </div>
+              ); })()}
               {post.tags?.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>{post.tags.slice(0, 3).map(t => <span key={t} style={{ padding: "1px 6px", borderRadius: 12, fontSize: 9, background: `${T.accent}12`, color: T.accent }}>{t}</span>)}</div>}
             </div>
           ))}
