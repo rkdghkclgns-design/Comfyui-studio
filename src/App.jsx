@@ -2453,7 +2453,7 @@ function ShowcaseSection({ theme, lang }) {
   const parseWorkflow = (jsonStr) => {
     try {
       const raw = JSON.parse(jsonStr);
-      const info = { model: null, steps: null, cfg: null, sampler: null, scheduler: null, width: null, height: null, seed: null, positive: null, negative: null, nodeCount: 0, detectedTags: [], _nodes: [] };
+      const info = { model: null, steps: null, cfg: null, sampler: null, scheduler: null, width: null, height: null, seed: null, positive: null, negative: null, nodeCount: 0, detectedTags: [], _nodes: [], _rawParsed: raw };
 
       // Detect format and extract nodes
       let isWebFormat = false;
@@ -2651,26 +2651,158 @@ function ShowcaseSection({ theme, lang }) {
           );
         })()}
 
-        {/* Node Graph Visualization */}
-        {info._nodes && info._nodes.length > 0 && (() => {
-          const NODE_COLORS = { "CheckpointLoaderSimple": "#2dd4a8", "CLIPTextEncode": "#fbbf24", "KSampler": "#f472b6", "VAEDecode": "#fb923c", "SaveImage": "#60a5fa", "EmptyLatentImage": "#22d3ee", "LoraLoader": "#a78bfa", "ControlNetApply": "#34d399", "LoadImage": "#818cf8", "VAEEncode": "#fb923c" };
-          const getColor = (t) => { for (const [k, v] of Object.entries(NODE_COLORS)) { if (t.includes(k)) return v; } return "#888"; };
-          return (
-            <div style={{ marginTop: 12, background: T.bg2, borderRadius: 14, border: `1px solid ${T.border}`, padding: 16, overflow: "auto" }}>
-              <div style={{ fontSize: 10, color: T.text4, marginBottom: 10, fontWeight: 600 }}>{isKo ? "워크플로우 노드 구조" : "Workflow Node Structure"}</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, minHeight: 40 }}>
-                {info._nodes.map((nd, i) => (
-                  <div key={i} style={{ padding: "6px 12px", borderRadius: 8, border: `2px solid ${getColor(nd)}`, background: `${getColor(nd)}10`, fontSize: 10, fontWeight: 600, color: getColor(nd), whiteSpace: "nowrap" }}>
-                    {nd}
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
+        {/* Interactive Node Graph */}
+        <WorkflowGraphView rawParsed={info._rawParsed} theme={T} isKo={isKo} />
       </div>
     );
   };
+
+  // Interactive workflow graph component with zoom/pan
+  function WorkflowGraphView({ rawParsed, theme: GT, isKo: gKo }) {
+    const svgRef = useRef(null);
+    const [viewBox, setViewBox] = useState(null);
+    const [dragging, setDragging] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const [zoom, setZoom] = useState(1);
+
+    const NODE_COLORS = { "CheckpointLoaderSimple": "#2dd4a8", "CheckpointLoader": "#2dd4a8", "CLIPTextEncode": "#fbbf24", "KSampler": "#f472b6", "KSamplerAdvanced": "#f472b6", "VAEDecode": "#fb923c", "SaveImage": "#60a5fa", "EmptyLatentImage": "#22d3ee", "LoraLoader": "#a78bfa", "ControlNetApply": "#34d399", "LoadImage": "#818cf8", "VAEEncode": "#fb923c", "UpscaleLatent": "#4ade80" };
+    const getColor = (t) => { for (const [k, v] of Object.entries(NODE_COLORS)) { if (t.includes(k)) return v; } return "#9ca3af"; };
+
+    // Extract graph data
+    const graphData = (() => {
+      if (!rawParsed) return null;
+      const nodes = [];
+      const links = [];
+
+      if (Array.isArray(rawParsed.nodes)) {
+        // Web format with positions
+        for (const n of rawParsed.nodes) {
+          const wv = n.widgets_values || [];
+          const details = [];
+          if (n.type?.includes("CheckpointLoader") && wv[0]) details.push(String(wv[0]));
+          if (n.type === "KSampler" && wv.length >= 6) { details.push(`Steps: ${wv[2]}`); details.push(`CFG: ${wv[3]}`); details.push(`${wv[4]}/${wv[5]}`); }
+          if (n.type === "CLIPTextEncode" && typeof wv[0] === "string") details.push(wv[0].length > 50 ? wv[0].slice(0, 50) + "..." : wv[0]);
+          if ((n.type === "EmptyLatentImage") && wv.length >= 2) details.push(`${wv[0]}x${wv[1]}`);
+          if (n.type?.includes("LoraLoader") && wv[0]) details.push(String(wv[0]));
+          nodes.push({ id: n.id, type: n.type || "Unknown", x: n.pos?.[0] || 0, y: n.pos?.[1] || 0, w: n.size?.[0] || 200, h: n.size?.[1] || 80, details });
+        }
+        if (Array.isArray(rawParsed.links)) {
+          for (const lk of rawParsed.links) {
+            if (lk.length >= 5) links.push({ from: lk[1], to: lk[3], type: lk[5] || "" });
+          }
+        }
+      } else if (typeof rawParsed === "object" && !Array.isArray(rawParsed)) {
+        // API format — auto-layout
+        const entries = Object.entries(rawParsed);
+        let col = 0;
+        for (const [key, n] of entries) {
+          const ct = n.class_type || "Unknown";
+          const inp = n.inputs || {};
+          const details = [];
+          if (ct.includes("CheckpointLoader") && inp.ckpt_name) details.push(inp.ckpt_name);
+          if (ct === "KSampler" || ct === "KSamplerAdvanced") { if (inp.steps) details.push(`Steps: ${inp.steps}`); if (inp.cfg) details.push(`CFG: ${inp.cfg}`); if (inp.sampler_name) details.push(inp.sampler_name); }
+          if (ct === "CLIPTextEncode" && typeof inp.text === "string") details.push(inp.text.length > 50 ? inp.text.slice(0, 50) + "..." : inp.text);
+          if (ct === "EmptyLatentImage" && inp.width) details.push(`${inp.width}x${inp.height}`);
+          nodes.push({ id: parseInt(key) || col, type: ct, x: col * 260, y: Math.floor(col / 4) * 140, w: 220, h: 70 + details.length * 14, details });
+          // Detect links from input references
+          for (const [, v] of Object.entries(inp)) { if (Array.isArray(v) && v.length === 2 && typeof v[0] === "string") { const srcId = parseInt(v[0]); if (!isNaN(srcId)) links.push({ from: srcId, to: parseInt(key) || col }); } }
+          col++;
+        }
+      }
+      return nodes.length > 0 ? { nodes, links } : null;
+    })();
+
+    useEffect(() => {
+      if (!graphData) return;
+      const { nodes } = graphData;
+      const minX = Math.min(...nodes.map(n => n.x)) - 40;
+      const minY = Math.min(...nodes.map(n => n.y)) - 40;
+      const maxX = Math.max(...nodes.map(n => n.x + n.w)) + 40;
+      const maxY = Math.max(...nodes.map(n => n.y + n.h)) + 40;
+      setViewBox({ x: minX, y: minY, w: maxX - minX, h: maxY - minY });
+    }, [graphData]);
+
+    if (!graphData || !viewBox) return null;
+
+    const handleWheel = (e) => {
+      e.preventDefault();
+      const factor = e.deltaY > 0 ? 1.15 : 0.87;
+      const newZoom = Math.max(0.1, Math.min(5, zoom * factor));
+      const rect = svgRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const mx = (e.clientX - rect.left) / rect.width;
+      const my = (e.clientY - rect.top) / rect.height;
+      setViewBox(prev => {
+        const nw = prev.w * factor;
+        const nh = prev.h * factor;
+        return { x: prev.x - (nw - prev.w) * mx, y: prev.y - (nh - prev.h) * my, w: nw, h: nh };
+      });
+      setZoom(newZoom);
+    };
+
+    const handleMouseDown = (e) => { setDragging(true); setDragStart({ x: e.clientX, y: e.clientY }); };
+    const handleMouseMove = (e) => {
+      if (!dragging) return;
+      const rect = svgRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const dx = (e.clientX - dragStart.x) * viewBox.w / rect.width;
+      const dy = (e.clientY - dragStart.y) * viewBox.h / rect.height;
+      setViewBox(prev => ({ ...prev, x: prev.x - dx, y: prev.y - dy }));
+      setDragStart({ x: e.clientX, y: e.clientY });
+    };
+    const handleMouseUp = () => setDragging(false);
+
+    const nodeMap = {};
+    graphData.nodes.forEach(n => { nodeMap[n.id] = n; });
+
+    return (
+      <div style={{ marginTop: 12, background: GT.bg2, borderRadius: 14, border: `1px solid ${GT.border}`, overflow: "hidden" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: `1px solid ${GT.border}` }}>
+          <span style={{ fontSize: 10, color: GT.text4, fontWeight: 600 }}>{gKo ? "워크플로우 노드 그래프" : "Workflow Node Graph"}</span>
+          <span style={{ fontSize: 9, color: GT.text4 }}>{gKo ? "마우스 휠: 확대/축소, 드래그: 이동" : "Wheel: zoom, Drag: pan"}</span>
+        </div>
+        <svg
+          ref={svgRef}
+          viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
+          style={{ width: "100%", height: 320, cursor: dragging ? "grabbing" : "grab", background: GT.bg }}
+          onWheel={handleWheel}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+          {/* Connection lines */}
+          {graphData.links.map((lk, i) => {
+            const src = nodeMap[lk.from];
+            const tgt = nodeMap[lk.to];
+            if (!src || !tgt) return null;
+            const sx = src.x + src.w;
+            const sy = src.y + src.h / 2;
+            const tx = tgt.x;
+            const ty = tgt.y + tgt.h / 2;
+            const cx = Math.abs(tx - sx) * 0.5;
+            return <path key={i} d={`M${sx},${sy} C${sx + cx},${sy} ${tx - cx},${ty} ${tx},${ty}`} fill="none" stroke={getColor(src.type)} strokeWidth="2" opacity="0.4" />;
+          })}
+          {/* Nodes */}
+          {graphData.nodes.map(n => {
+            const c = getColor(n.type);
+            return (
+              <g key={n.id}>
+                <rect x={n.x} y={n.y} width={n.w} height={n.h} rx="8" fill={GT.bg2} stroke={c} strokeWidth="2" opacity="0.95" />
+                <rect x={n.x} y={n.y} width={n.w} height="22" rx="8" fill={c} opacity="0.2" />
+                <text x={n.x + 10} y={n.y + 15} fontSize="11" fontWeight="700" fill={c} fontFamily="'DM Sans',sans-serif">{n.type}</text>
+                {n.details.map((d, di) => (
+                  <text key={di} x={n.x + 10} y={n.y + 34 + di * 14} fontSize="9" fill={GT.text3} fontFamily="'JetBrains Mono',monospace">
+                    {d.length > 35 ? d.slice(0, 35) + "..." : d}
+                  </text>
+                ))}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    );
+  }
 
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
