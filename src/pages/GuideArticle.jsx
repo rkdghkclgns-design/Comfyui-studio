@@ -78,7 +78,7 @@ export default function GuideArticle() {
         <div style={{ textAlign: "center", marginTop: 48, padding: 32, background: T.bg2, borderRadius: 16, border: `1px solid ${T.border}` }}>
           <h3 style={{ fontFamily: SERIF, fontSize: 20, marginBottom: 12, color: T.text }}>ComfyUI Studio\uB85C \uBC14\uB85C \uC2DC\uC791\uD558\uC138\uC694</h3>
           <p style={{ fontSize: 14, color: T.text2, marginBottom: 20 }}>\uBCF5\uC7A1\uD55C \uC124\uC815 \uC5C6\uC774 AI\uAC00 \uC6CC\uD06C\uD50C\uB85C\uC6B0\uB97C \uC790\uB3D9\uC73C\uB85C \uC0DD\uC131\uD574\uC90D\uB2C8\uB2E4.</p>
-          <Link to="/app" style={{
+          <Link to="/" style={{
             display: "inline-block", padding: "12px 32px", borderRadius: 10, fontSize: 15, fontWeight: 700,
             background: T.accent2, color: "#fff", textDecoration: "none",
           }}>ComfyUI Studio \uC5F4\uAE30 &rarr;</Link>

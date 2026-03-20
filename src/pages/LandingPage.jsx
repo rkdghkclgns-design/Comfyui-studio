@@ -43,7 +43,7 @@ export default function LandingPage() {
           \uC790\uB3D9\uC73C\uB85C \uC0DD\uC131\uD574\uC8FC\uB294 \uBB34\uB8CC \uC628\uB77C\uC778 \uB3C4\uAD6C\uC785\uB2C8\uB2E4.
           \uCD08\uBCF4\uC790\uBD80\uD130 \uC804\uBB38\uAC00\uAE4C\uC9C0 \uB204\uAD6C\uB098 \uD3B8\uC548\uD558\uAC8C \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.
         </p>
-        <Link to="/app" style={{
+        <Link to="/" style={{
           display: "inline-block", padding: "14px 36px", borderRadius: 12, fontSize: 16, fontWeight: 700,
           background: T.accent2, color: "#fff", textDecoration: "none", transition: "transform 0.2s",
         }}>
@@ -113,7 +113,7 @@ export default function LandingPage() {
       <section style={{ textAlign: "center", padding: "60px 0 40px" }}>
         <h2 style={{ fontFamily: SERIF, fontSize: 24, marginBottom: 16, color: T.text }}>\uC9C0\uAE08 \uBC14\uB85C \uC2DC\uC791\uD558\uC138\uC694</h2>
         <p style={{ fontSize: 15, color: T.text2, marginBottom: 24 }}>\uBCC4\uB3C4\uC758 \uC124\uCE58 \uC5C6\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C \uBC14\uB85C \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.</p>
-        <Link to="/app" style={{
+        <Link to="/" style={{
           display: "inline-block", padding: "14px 36px", borderRadius: 12, fontSize: 16, fontWeight: 700,
           background: T.accent2, color: "#fff", textDecoration: "none",
         }}>

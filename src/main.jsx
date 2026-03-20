@@ -22,8 +22,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   <BrowserRouter>
     <Suspense fallback={<Loading />}>
       <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/app" element={<App />} />
+        <Route path="/" element={<App />} />
+        <Route path="/landing" element={<LandingPage />} />
         <Route path="/guides" element={<GuidesIndex />} />
         <Route path="/guides/:slug" element={<GuideArticle />} />
         <Route path="/privacy" element={<PrivacyPage />} />

@@ -45,7 +45,7 @@ export default function ContentLayout({ children, title, description }) {
                 background: location.pathname === to ? T.glow : "transparent",
               }}>{label}</Link>
             ))}
-            <Link to="/app" style={{
+            <Link to="/" style={{
               textDecoration: "none", padding: "6px 16px", borderRadius: 8, fontSize: 14, fontWeight: 600,
               color: "#fff", background: T.accent2,
             }}>Open App</Link>

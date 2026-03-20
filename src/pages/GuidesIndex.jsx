@@ -41,7 +41,7 @@ export default function GuidesIndex() {
         <div style={{ textAlign: "center", marginTop: 40, padding: "32px", background: T.bg2, borderRadius: 16, border: `1px solid ${T.border}` }}>
           <h3 style={{ fontFamily: SERIF, fontSize: 20, marginBottom: 12, color: T.text }}>\uC9C0\uAE08 \uBC14\uB85C \uC2DC\uC791\uD558\uC138\uC694</h3>
           <p style={{ fontSize: 14, color: T.text2, marginBottom: 20 }}>ComfyUI Studio\uC5D0\uC11C AI \uC6CC\uD06C\uD50C\uB85C\uC6B0\uB97C \uC790\uB3D9\uC73C\uB85C \uC0DD\uC131\uD574\uBCF4\uC138\uC694.</p>
-          <Link to="/app" style={{
+          <Link to="/" style={{
             display: "inline-block", padding: "12px 32px", borderRadius: 10, fontSize: 15, fontWeight: 700,
             background: T.accent2, color: "#fff", textDecoration: "none",
           }}>ComfyUI Studio \uC5F4\uAE30 &rarr;</Link>
