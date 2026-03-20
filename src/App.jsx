@@ -3820,7 +3820,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
               <div style={{ display: "flex", justifyContent: "center", gap: 16, marginBottom: 12 }}>
                 <button onClick={() => setLegalPopup("privacy")} style={{ background: "none", border: "none", color: T.text4, fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>{lang === "ko" ? "개인정보처리방침" : "Privacy Policy"}</button>
                 <button onClick={() => setLegalPopup("terms")} style={{ background: "none", border: "none", color: T.text4, fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>{lang === "ko" ? "이용약관" : "Terms of Service"}</button>
-                <a href="https://github.com/rkdghkclgns-design/Comfyui-studio" target="_blank" rel="noopener noreferrer" style={{ color: T.text4, fontSize: 11, textDecoration: "underline" }}>GitHub</a>
+                <button onClick={() => setLegalPopup("contact")} style={{ background: "none", border: "none", color: T.text4, fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>{lang === "ko" ? "이용문의" : "Contact"}</button>
               </div>
               <div style={{ fontSize: 10, color: T.text4 }}>&copy; {new Date().getFullYear()} ComfyUI Studio. All rights reserved.</div>
             </div>
@@ -4113,7 +4113,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
           <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => setLegalPopup(null)}>
             <div style={{ background: T.bg2, borderRadius: 20, padding: 32, maxWidth: 700, width: "100%", maxHeight: "90vh", overflow: "auto", border: `1px solid ${T.border}` }} onClick={e => e.stopPropagation()}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
-                <h2 style={{ fontSize: 20, fontWeight: 800, color: T.text }}>{legalPopup === "privacy" ? (lang === "ko" ? "개인정보처리방침" : "Privacy Policy") : (lang === "ko" ? "이용약관" : "Terms of Service")}</h2>
+                <h2 style={{ fontSize: 20, fontWeight: 800, color: T.text }}>{legalPopup === "privacy" ? (lang === "ko" ? "개인정보처리방침" : "Privacy Policy") : legalPopup === "terms" ? (lang === "ko" ? "이용약관" : "Terms of Service") : (lang === "ko" ? "이용문의" : "Contact")}</h2>
                 <button onClick={() => setLegalPopup(null)} style={{ background: "none", border: "none", color: T.text3, fontSize: 22, cursor: "pointer" }}>&times;</button>
               </div>
               {legalPopup === "privacy" ? (
@@ -4128,7 +4128,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
                   <h3 style={{ fontSize: 15, fontWeight: 700, color: T.text, marginTop: 20 }}>4. {lang === "ko" ? "이용자의 권리" : "Your Rights"}</h3>
                   <p>{lang === "ko" ? "브라우저 로컬 저장소의 데이터를 언제든지 삭제할 수 있습니다. 쿠키 사용을 거부할 수 있습니다. 광고 개인화를 비활성화할 수 있습니다." : "You can delete localStorage data, refuse cookies, and disable ad personalization at any time."}</p>
                   <h3 style={{ fontSize: 15, fontWeight: 700, color: T.text, marginTop: 20 }}>5. {lang === "ko" ? "문의" : "Contact"}</h3>
-                  <p>{lang === "ko" ? "개인정보 처리에 대한 문의는 GitHub 저장소의 Issues를 통해 접수할 수 있습니다." : "Contact us through GitHub Issues for privacy inquiries."}</p>
+                  <p>{lang === "ko" ? "개인정보 처리에 대한 문의는 이메일(rkdghkclgns@naver.com)을 통해 접수할 수 있습니다." : "For privacy inquiries, please contact us at rkdghkclgns@naver.com."}</p>
                 </div>
               ) : (
                 <div style={{ fontSize: 13, color: T.text2, lineHeight: 1.8 }}>
@@ -4140,7 +4140,16 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
                   <h3 style={{ fontSize: 15, fontWeight: 700, color: T.text, marginTop: 20 }}>3. {lang === "ko" ? "면책 조항" : "Disclaimer"}</h3>
                   <p>{lang === "ko" ? "서비스는 '있는 그대로' 제공되며, 어떠한 보증도 하지 않습니다. AI로 생성된 콘텐츠는 저작권, 초상권 등 법적 문제가 발생할 수 있으며, 이에 대한 책임은 사용자에게 있습니다." : "The service is provided 'as is' without warranties. Users are responsible for AI-generated content."}</p>
                   <h3 style={{ fontSize: 15, fontWeight: 700, color: T.text, marginTop: 20 }}>4. {lang === "ko" ? "문의" : "Contact"}</h3>
-                  <p>{lang === "ko" ? "약관에 대한 문의는 GitHub 저장소의 Issues를 통해 접수할 수 있습니다." : "Contact us through GitHub Issues for terms inquiries."}</p>
+                  <p>{lang === "ko" ? "약관에 대한 문의는 이메일(rkdghkclgns@naver.com)을 통해 접수할 수 있습니다." : "For terms inquiries, please contact us at rkdghkclgns@naver.com."}</p>
+                </div>
+              )}
+              {legalPopup === "contact" && (
+                <div style={{ fontSize: 13, color: T.text2, lineHeight: 1.8, textAlign: "center" }}>
+                  <div style={{ fontSize: 48, marginBottom: 16 }}>&#9993;</div>
+                  <p style={{ fontSize: 16, fontWeight: 600, color: T.text, marginBottom: 8 }}>{lang === "ko" ? "이용 문의" : "Contact Us"}</p>
+                  <p style={{ marginBottom: 24 }}>{lang === "ko" ? "ComfyUI Studio 이용에 관한 문의, 버그 신고, 기능 요청 등은 아래 이메일로 연락해주세요." : "For inquiries, bug reports, or feature requests, please contact us via email below."}</p>
+                  <a href="mailto:rkdghkclgns@naver.com" style={{ display: "inline-block", padding: "12px 28px", borderRadius: 10, background: T.accent2, color: "#fff", fontSize: 15, fontWeight: 700, textDecoration: "none" }}>rkdghkclgns@naver.com</a>
+                  <p style={{ marginTop: 20, fontSize: 12, color: T.text4 }}>{lang === "ko" ? "평일 기준 1~3일 이내 답변드립니다." : "We typically respond within 1-3 business days."}</p>
                 </div>
               )}
             </div>
