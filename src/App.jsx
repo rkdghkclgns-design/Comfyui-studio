@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { supabase } from "./lib/supabase.js";
 
 // ═══════════════════════════════════════════
 // PERSISTENT STORAGE HELPER (#3)
@@ -2412,6 +2413,181 @@ function GuideSection({ theme, lang }) {
 }
 
 // ═══════════════════════════════════════════
+// SHOWCASE SECTION (Community Board)
+// ═══════════════════════════════════════════
+function ShowcaseSection({ theme, lang }) {
+  const T = THEMES[theme] || THEMES.dark;
+  const isKo = lang === "ko";
+  const [user, setUser] = useState(null);
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [formData, setFormData] = useState({ title: "", description: "", workflow_json: "", tags: [] });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const TAG_OPTIONS = ["txt2img", "img2img", "controlnet", "upscale", "inpaint", "anime", "realistic", "SDXL", "Flux", "SD1.5", "LoRA", "video"];
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_ev, session) => setUser(session?.user ?? null));
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchPosts = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase.from("showcase_posts").select("*").order("created_at", { ascending: false }).limit(20);
+    setPosts(data || []);
+    setLoading(false);
+  }, []);
+  useEffect(() => { fetchPosts(); }, [fetchPosts]);
+
+  const handleLogin = async () => {
+    await supabase.auth.signInWithOAuth({ provider: "github", options: { redirectTo: window.location.origin } });
+  };
+  const handleLogout = async () => { await supabase.auth.signOut(); setUser(null); };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!user || !formData.title.trim() || !formData.workflow_json.trim()) { setError(isKo ? "제목과 워크플로우 JSON을 입력해주세요." : "Title and Workflow JSON required."); return; }
+    try { JSON.parse(formData.workflow_json); } catch { setError(isKo ? "올바른 JSON 형식이 아닙니다." : "Invalid JSON."); return; }
+    setSubmitting(true); setError("");
+    const { error: err } = await supabase.from("showcase_posts").insert({
+      user_id: user.id, username: user.user_metadata?.user_name || "anonymous", avatar_url: user.user_metadata?.avatar_url || null,
+      title: formData.title.trim(), description: formData.description.trim() || null, workflow_json: formData.workflow_json.trim(), tags: formData.tags,
+    });
+    setSubmitting(false);
+    if (err) { setError(err.message); return; }
+    setFormData({ title: "", description: "", workflow_json: "", tags: [] }); setShowForm(false); fetchPosts();
+  };
+
+  const handleDelete = async (postId) => {
+    if (!confirm(isKo ? "삭제하시겠습니까?" : "Delete?")) return;
+    await supabase.from("showcase_posts").delete().eq("id", postId);
+    setSelectedPost(null); fetchPosts();
+  };
+
+  const copyJSON = (json) => { navigator.clipboard.writeText(json).catch(() => {}); };
+
+  const timeAgo = (d) => {
+    const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
+    if (m < 1) return isKo ? "방금" : "now";
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h`;
+    return `${Math.floor(h / 24)}d`;
+  };
+
+  const inputS = { width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${T.border2}`, background: T.bg3, color: T.text, fontSize: 13, fontFamily: "'DM Sans',sans-serif", outline: "none", boxSizing: "border-box" };
+
+  return (
+    <div style={{ marginTop: 48, padding: "32px 0", borderTop: `1px solid ${T.border}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: T.text, marginBottom: 4 }}>{isKo ? "커뮤니티 Showcase" : "Community Showcase"}</h2>
+          <p style={{ fontSize: 12, color: T.text4, margin: 0 }}>{isKo ? "나의 워크플로우를 공유하고 다른 사람의 워크플로우를 탐색하세요." : "Share your workflows and explore others."}</p>
+        </div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          {user ? (<>
+            <img src={user.user_metadata?.avatar_url} alt="" style={{ width: 22, height: 22, borderRadius: "50%" }} />
+            <span style={{ fontSize: 11, color: T.text2 }}>{user.user_metadata?.user_name}</span>
+            <button onClick={() => setShowForm(true)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: T.accent2, color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>+ {isKo ? "공유" : "Share"}</button>
+            <button onClick={handleLogout} style={{ padding: "6px 10px", borderRadius: 8, border: `1px solid ${T.border}`, background: "transparent", color: T.text3, fontSize: 10, cursor: "pointer" }}>Logout</button>
+          </>) : (
+            <button onClick={handleLogin} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#24292f", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="white"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+              GitHub Login
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Post Form Modal */}
+      {showForm && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => setShowForm(false)}>
+          <div style={{ background: T.bg2, borderRadius: 16, padding: 28, maxWidth: 560, width: "100%", maxHeight: "85vh", overflow: "auto", border: `1px solid ${T.border}` }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20, color: T.text }}>{isKo ? "워크플로우 공유" : "Share Workflow"}</h3>
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <input value={formData.title} onChange={e => setFormData(p => ({ ...p, title: e.target.value }))} placeholder={isKo ? "제목" : "Title"} maxLength={100} style={inputS} />
+              <textarea value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} placeholder={isKo ? "설명 (선택)" : "Description (optional)"} rows={2} maxLength={500} style={{ ...inputS, resize: "vertical" }} />
+              <textarea value={formData.workflow_json} onChange={e => setFormData(p => ({ ...p, workflow_json: e.target.value }))} placeholder="Workflow JSON" rows={5} style={{ ...inputS, fontFamily: "'JetBrains Mono',monospace", fontSize: 11, resize: "vertical" }} />
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {TAG_OPTIONS.map(tag => (
+                  <button key={tag} type="button" onClick={() => setFormData(p => ({ ...p, tags: p.tags.includes(tag) ? p.tags.filter(t => t !== tag) : [...p.tags, tag] }))} style={{
+                    padding: "3px 10px", borderRadius: 16, fontSize: 10, cursor: "pointer",
+                    border: `1px solid ${formData.tags.includes(tag) ? T.accent : T.border}`,
+                    background: formData.tags.includes(tag) ? `${T.accent}20` : "transparent",
+                    color: formData.tags.includes(tag) ? T.accent : T.text3,
+                  }}>{tag}</button>
+                ))}
+              </div>
+              {error && <p style={{ color: "#e55", fontSize: 12, margin: 0 }}>{error}</p>}
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button type="button" onClick={() => setShowForm(false)} style={{ padding: "8px 16px", borderRadius: 8, border: `1px solid ${T.border}`, background: "transparent", color: T.text2, cursor: "pointer", fontSize: 12 }}>{isKo ? "취소" : "Cancel"}</button>
+                <button type="submit" disabled={submitting} style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: T.accent2, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700, opacity: submitting ? 0.5 : 1 }}>{submitting ? "..." : isKo ? "게시" : "Post"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Post Detail Modal */}
+      {selectedPost && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => setSelectedPost(null)}>
+          <div style={{ background: T.bg2, borderRadius: 16, padding: 28, maxWidth: 640, width: "100%", maxHeight: "85vh", overflow: "auto", border: `1px solid ${T.border}` }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 6 }}>{selectedPost.title}</h3>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  {selectedPost.avatar_url && <img src={selectedPost.avatar_url} alt="" style={{ width: 18, height: 18, borderRadius: "50%" }} />}
+                  <span style={{ fontSize: 11, color: T.text2 }}>{selectedPost.username}</span>
+                  <span style={{ fontSize: 10, color: T.text4 }}>{timeAgo(selectedPost.created_at)}</span>
+                </div>
+              </div>
+              <button onClick={() => setSelectedPost(null)} style={{ background: "none", border: "none", color: T.text3, fontSize: 18, cursor: "pointer" }}>&times;</button>
+            </div>
+            {selectedPost.description && <p style={{ fontSize: 13, color: T.text2, marginBottom: 14, lineHeight: 1.6 }}>{selectedPost.description}</p>}
+            {selectedPost.tags?.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 14 }}>{selectedPost.tags.map(t => <span key={t} style={{ padding: "2px 8px", borderRadius: 16, fontSize: 10, background: `${T.accent}15`, color: T.accent, border: `1px solid ${T.accent}30` }}>{t}</span>)}</div>}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color: T.text2, fontWeight: 600 }}>Workflow JSON</span>
+              <button onClick={() => copyJSON(selectedPost.workflow_json)} style={{ padding: "3px 10px", borderRadius: 6, border: `1px solid ${T.border}`, background: T.bg3, color: T.text2, fontSize: 11, cursor: "pointer" }}>{isKo ? "복사" : "Copy"}</button>
+            </div>
+            <pre style={{ background: T.bg, padding: 14, borderRadius: 10, border: `1px solid ${T.border}`, fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: T.text2, overflow: "auto", maxHeight: 250, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{selectedPost.workflow_json}</pre>
+            {user && user.id === selectedPost.user_id && <button onClick={() => handleDelete(selectedPost.id)} style={{ marginTop: 14, padding: "6px 14px", borderRadius: 8, border: `1px solid #e55`, background: "transparent", color: "#e55", fontSize: 11, cursor: "pointer" }}>{isKo ? "삭제" : "Delete"}</button>}
+          </div>
+        </div>
+      )}
+
+      {/* Posts Grid */}
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40, color: T.text3, fontSize: 12 }}>Loading...</div>
+      ) : posts.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 40, color: T.text3 }}>
+          <p style={{ fontSize: 14, marginBottom: 4 }}>{isKo ? "아직 공유된 워크플로우가 없습니다." : "No workflows shared yet."}</p>
+          <p style={{ fontSize: 12 }}>{isKo ? "첫 번째로 공유해보세요!" : "Be the first to share!"}</p>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
+          {posts.map(post => (
+            <div key={post.id} onClick={() => setSelectedPost(post)} style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, cursor: "pointer", transition: "border-color .2s" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                {post.avatar_url && <img src={post.avatar_url} alt="" style={{ width: 18, height: 18, borderRadius: "50%" }} />}
+                <span style={{ fontSize: 11, color: T.text2 }}>{post.username}</span>
+                <span style={{ fontSize: 10, color: T.text4, marginLeft: "auto" }}>{timeAgo(post.created_at)}</span>
+              </div>
+              <h4 style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 4, lineHeight: 1.3 }}>{post.title}</h4>
+              {post.description && <p style={{ fontSize: 11, color: T.text3, margin: "0 0 8px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{post.description}</p>}
+              {post.tags?.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>{post.tags.slice(0, 3).map(t => <span key={t} style={{ padding: "1px 6px", borderRadius: 12, fontSize: 9, background: `${T.accent}12`, color: T.accent }}>{t}</span>)}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
 // SPEC PANEL
 // ═══════════════════════════════════════════
 function SpecPanel({ category, config, theme, userVram, lang }) {
@@ -3147,6 +3323,9 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
 
             {/* ═══ GUIDE SECTION ═══ */}
             <GuideSection theme={theme} lang={lang} />
+
+            {/* ═══ SHOWCASE SECTION ═══ */}
+            <ShowcaseSection theme={theme} lang={lang} />
 
           </div>)}
 
