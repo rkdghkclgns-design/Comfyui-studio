@@ -10,13 +10,11 @@ export default function DonationButtons({ theme: T }) {
 
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-      <a href="https://ko-fi.com/" target="_blank" rel="noopener noreferrer" style={btnStyle}
-         title="Ko-fi (coming soon)">
-        <span style={{ fontSize: 16 }}>&#9749;</span> Ko-fi
+      <a href="https://github.com/sponsors/rkdghkclgns-design" target="_blank" rel="noopener noreferrer" style={btnStyle}>
+        <span style={{ fontSize: 16 }}>&#10084;&#65039;</span> GitHub Sponsor
       </a>
-      <a href="https://github.com/sponsors/" target="_blank" rel="noopener noreferrer" style={btnStyle}
-         title="GitHub Sponsors (coming soon)">
-        <span style={{ fontSize: 16 }}>&#10084;&#65039;</span> Sponsor
+      <a href="https://ko-fi.com/comfyuistudio" target="_blank" rel="noopener noreferrer" style={btnStyle}>
+        <span style={{ fontSize: 16 }}>&#9749;</span> Ko-fi
       </a>
     </div>
   );
