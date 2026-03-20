@@ -2424,11 +2424,26 @@ function ShowcaseSection({ theme, lang }) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
-  const [formData, setFormData] = useState({ title: "", description: "", workflow_json: "", tags: [] });
+  const [formData, setFormData] = useState({ title: "", description: "", workflow_json: "", tags: [], category: "t2i" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [filterCat, setFilterCat] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const POSTS_PER_PAGE = 12;
 
   const TAG_OPTIONS = ["txt2img", "img2img", "controlnet", "upscale", "inpaint", "anime", "realistic", "SDXL", "Flux", "SD1.5", "LoRA", "video"];
+  const CATEGORIES = [
+    { id: "all", icon: "📋", label: isKo ? "전체" : "All" },
+    { id: "t2i", icon: "✦", label: "Text → Image" },
+    { id: "i2i", icon: "◑", label: "Image → Image" },
+    { id: "inpaint", icon: "▢", label: "Inpainting" },
+    { id: "upscale", icon: "○", label: "Upscale" },
+    { id: "t2v", icon: "▶", label: "Text → Video" },
+    { id: "i2v", icon: "◉", label: "Image → Video" },
+    { id: "controlnet", icon: "◆", label: "ControlNet" },
+    { id: "lora", icon: "⊕", label: "LoRA" },
+  ];
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => { setUser(session?.user ?? null); setAuthLoading(false); });
@@ -2438,11 +2453,23 @@ function ShowcaseSection({ theme, lang }) {
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from("showcase_posts").select("*").order("created_at", { ascending: false }).limit(30);
+    const { data } = await supabase.from("showcase_posts").select("*").order("created_at", { ascending: false }).limit(200);
     setPosts(data || []);
     setLoading(false);
   }, []);
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
+
+  // Client-side filter + search + pagination
+  const filteredPosts = posts.filter(p => {
+    if (filterCat !== "all" && p.category !== filterCat) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      return (p.title || "").toLowerCase().includes(q) || (p.description || "").toLowerCase().includes(q) || (p.username || "").toLowerCase().includes(q) || (p.tags || []).some(t => t.toLowerCase().includes(q));
+    }
+    return true;
+  });
+  const totalPages = Math.max(1, Math.ceil(filteredPosts.length / POSTS_PER_PAGE));
+  const pagedPosts = filteredPosts.slice((currentPage - 1) * POSTS_PER_PAGE, currentPage * POSTS_PER_PAGE);
 
   const handleLogin = async () => {
     await supabase.auth.signInWithOAuth({ provider: "github", options: { redirectTo: window.location.origin } });
@@ -2814,11 +2841,11 @@ function ShowcaseSection({ theme, lang }) {
     setSubmitting(true); setError("");
     const { error: err } = await supabase.from("showcase_posts").insert({
       user_id: user.id, username: user.user_metadata?.user_name || "anonymous", avatar_url: user.user_metadata?.avatar_url || null,
-      title: formData.title.trim(), description: formData.description.trim() || null, workflow_json: formData.workflow_json.trim(), tags: formData.tags,
+      title: formData.title.trim(), description: formData.description.trim() || null, workflow_json: formData.workflow_json.trim(), tags: formData.tags, category: formData.category || "t2i",
     });
     setSubmitting(false);
     if (err) { setError(err.message); return; }
-    setFormData({ title: "", description: "", workflow_json: "", tags: [] }); setShowForm(false); fetchPosts();
+    setFormData({ title: "", description: "", workflow_json: "", tags: [], category: "t2i" }); setShowForm(false); fetchPosts();
   };
 
   const handleDelete = async (postId) => {
@@ -2888,6 +2915,19 @@ function ShowcaseSection({ theme, lang }) {
             <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24, color: T.text }}>{isKo ? "워크플로우 공유" : "Share Workflow"}</h3>
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <input value={formData.title} onChange={e => setFormData(p => ({ ...p, title: e.target.value }))} placeholder={isKo ? "제목" : "Title"} maxLength={100} style={inputS} />
+              <div>
+                <div style={{ fontSize: 12, color: T.text2, marginBottom: 6 }}>{isKo ? "카테고리" : "Category"}</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {CATEGORIES.filter(c => c.id !== "all").map(c => (
+                    <button key={c.id} type="button" onClick={() => setFormData(p => ({ ...p, category: c.id }))} style={{
+                      padding: "5px 12px", borderRadius: 8, fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
+                      border: `1px solid ${formData.category === c.id ? T.accent : T.border}`,
+                      background: formData.category === c.id ? `${T.accent}18` : "transparent",
+                      color: formData.category === c.id ? T.accent : T.text3,
+                    }}>{c.icon} {c.label}</button>
+                  ))}
+                </div>
+              </div>
               <textarea value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} placeholder={isKo ? "설명 (선택)" : "Description (optional)"} rows={3} maxLength={500} style={{ ...inputS, resize: "vertical" }} />
               <div>
                 <label style={{ display: "block", padding: "12px 16px", borderRadius: 10, border: `2px dashed ${T.border2}`, background: T.bg3, color: T.text2, fontSize: 13, textAlign: "center", cursor: "pointer", marginBottom: 8 }}>
@@ -2953,41 +2993,78 @@ function ShowcaseSection({ theme, lang }) {
         </div>
       )}
 
+      {/* Category Filter */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+        {CATEGORIES.map(c => (
+          <button key={c.id} onClick={() => { setFilterCat(c.id); setCurrentPage(1); }} style={{
+            padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
+            border: `1px solid ${filterCat === c.id ? T.accent : T.border}`,
+            background: filterCat === c.id ? `${T.accent}18` : T.bg2,
+            color: filterCat === c.id ? T.accent : T.text3,
+          }}><span style={{ fontSize: 13 }}>{c.icon}</span> {c.label}</button>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div style={{ marginBottom: 16 }}>
+        <input value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+          placeholder={isKo ? "워크플로우 검색 (제목, 설명, 태그, 작성자)" : "Search workflows (title, description, tags, author)"}
+          style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${T.border}`, background: T.bg3, color: T.text, fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+      </div>
+
       {/* Posts Grid */}
       {loading ? (
         <div style={{ textAlign: "center", padding: 40, color: T.text3, fontSize: 12 }}>Loading...</div>
-      ) : posts.length === 0 ? (
+      ) : filteredPosts.length === 0 ? (
         <div style={{ textAlign: "center", padding: 40, color: T.text3 }}>
-          <p style={{ fontSize: 14, marginBottom: 4 }}>{isKo ? "아직 공유된 워크플로우가 없습니다." : "No workflows shared yet."}</p>
-          <p style={{ fontSize: 12 }}>{isKo ? "첫 번째로 공유해보세요!" : "Be the first to share!"}</p>
+          <p style={{ fontSize: 14, marginBottom: 4 }}>{searchQuery ? (isKo ? "검색 결과가 없습니다." : "No results found.") : (isKo ? "아직 공유된 워크플로우가 없습니다." : "No workflows shared yet.")}</p>
+          {!searchQuery && <p style={{ fontSize: 12 }}>{isKo ? "첫 번째로 공유해보세요!" : "Be the first to share!"}</p>}
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
-          {posts.map(post => (
-            <div key={post.id} onClick={() => setSelectedPost(post)} style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, cursor: "pointer", transition: "border-color .2s" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                {post.avatar_url && <img src={post.avatar_url} alt="" style={{ width: 18, height: 18, borderRadius: "50%" }} />}
-                <span style={{ fontSize: 11, color: T.text2 }}>{post.username}</span>
-                <span style={{ fontSize: 10, color: T.text4, marginLeft: "auto" }}>{timeAgo(post.created_at)}</span>
-              </div>
-              <h4 style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 4, lineHeight: 1.3 }}>{post.title}</h4>
-              {post.description && <p style={{ fontSize: 11, color: T.text3, margin: "0 0 8px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{post.description}</p>}
-              {/* Card mini preview */}
-              {(() => { const pi = parseWorkflow(post.workflow_json); if (!pi) return null; return (
-                <div style={{ marginBottom: 8, padding: "8px 10px", background: T.bg, borderRadius: 8, border: `1px solid ${T.border}` }}>
-                  {pi.model && <div style={{ fontSize: 10, fontWeight: 600, color: T.text, marginBottom: 4, fontFamily: "'JetBrains Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pi.model}</div>}
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {pi.steps != null && <span style={{ fontSize: 9, color: T.text4 }}>Steps:{pi.steps}</span>}
-                    {pi.cfg != null && <span style={{ fontSize: 9, color: T.text4 }}>CFG:{pi.cfg}</span>}
-                    {pi.width && pi.height && <span style={{ fontSize: 9, color: T.text4 }}>{pi.width}x{pi.height}</span>}
-                    <span style={{ fontSize: 9, color: T.text4 }}>{pi.nodeCount}{isKo ? "노드" : " nodes"}</span>
-                  </div>
+        <>
+          <div style={{ fontSize: 11, color: T.text4, marginBottom: 10 }}>{filteredPosts.length}{isKo ? "개 워크플로우" : " workflows"} {filterCat !== "all" && `· ${CATEGORIES.find(c => c.id === filterCat)?.label}`}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
+            {pagedPosts.map(post => {
+              const catInfo = CATEGORIES.find(c => c.id === post.category);
+              return (
+              <div key={post.id} onClick={() => setSelectedPost(post)} style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, cursor: "pointer", transition: "border-color .2s" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                  {post.avatar_url && <img src={post.avatar_url} alt="" style={{ width: 18, height: 18, borderRadius: "50%" }} />}
+                  <span style={{ fontSize: 11, color: T.text2 }}>{post.username}</span>
+                  {catInfo && <span style={{ fontSize: 9, color: T.text4, marginLeft: "auto", padding: "1px 6px", background: T.bg3, borderRadius: 4 }}>{catInfo.icon} {catInfo.label}</span>}
+                  <span style={{ fontSize: 10, color: T.text4 }}>{timeAgo(post.created_at)}</span>
                 </div>
-              ); })()}
-              {post.tags?.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>{post.tags.slice(0, 3).map(t => <span key={t} style={{ padding: "1px 6px", borderRadius: 12, fontSize: 9, background: `${T.accent}12`, color: T.accent }}>{t}</span>)}</div>}
+                <h4 style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 4, lineHeight: 1.3 }}>{post.title}</h4>
+                {post.description && <p style={{ fontSize: 11, color: T.text3, margin: "0 0 8px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{post.description}</p>}
+                {(() => { const pi = parseWorkflow(post.workflow_json); if (!pi) return null; return (
+                  <div style={{ marginBottom: 8, padding: "8px 10px", background: T.bg, borderRadius: 8, border: `1px solid ${T.border}` }}>
+                    {pi.model && <div style={{ fontSize: 10, fontWeight: 600, color: T.text, marginBottom: 4, fontFamily: "'JetBrains Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pi.model}</div>}
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {pi.steps != null && <span style={{ fontSize: 9, color: T.text4 }}>Steps:{pi.steps}</span>}
+                      {pi.cfg != null && <span style={{ fontSize: 9, color: T.text4 }}>CFG:{pi.cfg}</span>}
+                      {pi.width && pi.height && <span style={{ fontSize: 9, color: T.text4 }}>{pi.width}x{pi.height}</span>}
+                      <span style={{ fontSize: 9, color: T.text4 }}>{pi.nodeCount}{isKo ? "노드" : " nodes"}</span>
+                    </div>
+                  </div>
+                ); })()}
+                {post.tags?.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>{post.tags.slice(0, 3).map(t => <span key={t} style={{ padding: "1px 6px", borderRadius: 12, fontSize: 9, background: `${T.accent}12`, color: T.accent }}>{t}</span>)}</div>}
+              </div>
+            ); })}
+          </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, marginTop: 20 }}>
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} style={{ padding: "6px 12px", borderRadius: 8, border: `1px solid ${T.border}`, background: T.bg2, color: currentPage <= 1 ? T.text4 : T.text2, fontSize: 12, cursor: currentPage <= 1 ? "default" : "pointer" }}>&larr;</button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2).map((p, i, arr) => (
+                <span key={p}>
+                  {i > 0 && arr[i - 1] !== p - 1 && <span style={{ color: T.text4, fontSize: 11 }}>...</span>}
+                  <button onClick={() => setCurrentPage(p)} style={{ padding: "6px 10px", borderRadius: 8, border: `1px solid ${currentPage === p ? T.accent : T.border}`, background: currentPage === p ? `${T.accent}18` : T.bg2, color: currentPage === p ? T.accent : T.text2, fontSize: 12, fontWeight: currentPage === p ? 700 : 400, cursor: "pointer", minWidth: 32 }}>{p}</button>
+                </span>
+              ))}
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} style={{ padding: "6px 12px", borderRadius: 8, border: `1px solid ${T.border}`, background: T.bg2, color: currentPage >= totalPages ? T.text4 : T.text2, fontSize: 12, cursor: currentPage >= totalPages ? "default" : "pointer" }}>&rarr;</button>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   );
