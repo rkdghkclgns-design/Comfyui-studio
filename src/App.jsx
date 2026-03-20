@@ -2724,23 +2724,30 @@ function ShowcaseSection({ theme, lang }) {
       setViewBox({ x: minX, y: minY, w: maxX - minX, h: maxY - minY });
     }, [graphData]);
 
-    if (!graphData || !viewBox) return null;
+    // Attach wheel handler via useEffect to use { passive: false }
+    useEffect(() => {
+      const el = svgRef.current;
+      if (!el) return;
+      const onWheel = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const factor = e.deltaY > 0 ? 1.15 : 0.87;
+        const rect = el.getBoundingClientRect();
+        if (!rect) return;
+        const mx = (e.clientX - rect.left) / rect.width;
+        const my = (e.clientY - rect.top) / rect.height;
+        setViewBox(prev => {
+          if (!prev) return prev;
+          const nw = prev.w * factor;
+          const nh = prev.h * factor;
+          return { x: prev.x - (nw - prev.w) * mx, y: prev.y - (nh - prev.h) * my, w: nw, h: nh };
+        });
+      };
+      el.addEventListener("wheel", onWheel, { passive: false });
+      return () => el.removeEventListener("wheel", onWheel);
+    });
 
-    const handleWheel = (e) => {
-      e.preventDefault();
-      const factor = e.deltaY > 0 ? 1.15 : 0.87;
-      const newZoom = Math.max(0.1, Math.min(5, zoom * factor));
-      const rect = svgRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const mx = (e.clientX - rect.left) / rect.width;
-      const my = (e.clientY - rect.top) / rect.height;
-      setViewBox(prev => {
-        const nw = prev.w * factor;
-        const nh = prev.h * factor;
-        return { x: prev.x - (nw - prev.w) * mx, y: prev.y - (nh - prev.h) * my, w: nw, h: nh };
-      });
-      setZoom(newZoom);
-    };
+    if (!graphData || !viewBox) return null;
 
     const handleMouseDown = (e) => { setDragging(true); setDragStart({ x: e.clientX, y: e.clientY }); };
     const handleMouseMove = (e) => {
@@ -2767,7 +2774,6 @@ function ShowcaseSection({ theme, lang }) {
           ref={svgRef}
           viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
           style={{ width: "100%", height: 320, cursor: dragging ? "grabbing" : "grab", background: GT.bg }}
-          onWheel={handleWheel}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
