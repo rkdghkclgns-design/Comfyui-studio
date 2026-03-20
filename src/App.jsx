@@ -2686,7 +2686,8 @@ function ShowcaseSection({ theme, lang }) {
           if (n.type === "CLIPTextEncode" && typeof wv[0] === "string") details.push(wv[0].length > 50 ? wv[0].slice(0, 50) + "..." : wv[0]);
           if ((n.type === "EmptyLatentImage") && wv.length >= 2) details.push(`${wv[0]}x${wv[1]}`);
           if (n.type?.includes("LoraLoader") && wv[0]) details.push(String(wv[0]));
-          nodes.push({ id: n.id, type: n.type || "Unknown", x: n.pos?.[0] || 0, y: n.pos?.[1] || 0, w: n.size?.[0] || 200, h: n.size?.[1] || 80, details });
+          const minH = 36 + details.length * 18;
+          nodes.push({ id: n.id, type: n.type || "Unknown", x: n.pos?.[0] || 0, y: n.pos?.[1] || 0, w: Math.max(n.size?.[0] || 200, 180), h: Math.max(n.size?.[1] || 80, minH), details });
         }
         if (Array.isArray(rawParsed.links)) {
           for (const lk of rawParsed.links) {
@@ -2705,7 +2706,7 @@ function ShowcaseSection({ theme, lang }) {
           if (ct === "KSampler" || ct === "KSamplerAdvanced") { if (inp.steps) details.push(`Steps: ${inp.steps}`); if (inp.cfg) details.push(`CFG: ${inp.cfg}`); if (inp.sampler_name) details.push(inp.sampler_name); }
           if (ct === "CLIPTextEncode" && typeof inp.text === "string") details.push(inp.text.length > 50 ? inp.text.slice(0, 50) + "..." : inp.text);
           if (ct === "EmptyLatentImage" && inp.width) details.push(`${inp.width}x${inp.height}`);
-          nodes.push({ id: parseInt(key) || col, type: ct, x: col * 260, y: Math.floor(col / 4) * 140, w: 220, h: 70 + details.length * 14, details });
+          nodes.push({ id: parseInt(key) || col, type: ct, x: (col % 4) * 260, y: Math.floor(col / 4) * 160, w: 220, h: Math.max(60, 36 + details.length * 18), details });
           // Detect links from input references
           for (const [, v] of Object.entries(inp)) { if (Array.isArray(v) && v.length === 2 && typeof v[0] === "string") { const srcId = parseInt(v[0]); if (!isNaN(srcId)) links.push({ from: srcId, to: parseInt(key) || col }); } }
           col++;
@@ -2767,7 +2768,7 @@ function ShowcaseSection({ theme, lang }) {
             }
           }}
           viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
-          style={{ width: "100%", height: 320, cursor: dragging ? "grabbing" : "grab", background: GT.bg, touchAction: "none" }}
+          style={{ width: "100%", height: 420, cursor: dragging ? "grabbing" : "grab", background: "#0a0a09", touchAction: "none" }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
@@ -2782,22 +2783,27 @@ function ShowcaseSection({ theme, lang }) {
             const sy = src.y + src.h / 2;
             const tx = tgt.x;
             const ty = tgt.y + tgt.h / 2;
-            const cx = Math.abs(tx - sx) * 0.5;
-            return <path key={i} d={`M${sx},${sy} C${sx + cx},${sy} ${tx - cx},${ty} ${tx},${ty}`} fill="none" stroke={getColor(src.type)} strokeWidth="2" opacity="0.4" />;
+            const cx = Math.abs(tx - sx) * 0.4 + 30;
+            return <path key={i} d={`M${sx},${sy} C${sx + cx},${sy} ${tx - cx},${ty} ${tx},${ty}`} fill="none" stroke={getColor(src.type)} strokeWidth="3" opacity="0.6" />;
           })}
           {/* Nodes */}
           {graphData.nodes.map(n => {
             const c = getColor(n.type);
+            const headerH = 28;
             return (
               <g key={n.id}>
-                <rect x={n.x} y={n.y} width={n.w} height={n.h} rx="8" fill={GT.bg2} stroke={c} strokeWidth="2" opacity="0.95" />
-                <rect x={n.x} y={n.y} width={n.w} height="22" rx="8" fill={c} opacity="0.2" />
-                <text x={n.x + 10} y={n.y + 15} fontSize="11" fontWeight="700" fill={c} fontFamily="'DM Sans',sans-serif">{n.type}</text>
+                <rect x={n.x} y={n.y} width={n.w} height={n.h} rx="6" fill="#1a1a1a" stroke={c} strokeWidth="2.5" />
+                <rect x={n.x} y={n.y} width={n.w} height={headerH} rx="6" fill={c} fillOpacity="0.25" />
+                <line x1={n.x} y1={n.y + headerH} x2={n.x + n.w} y2={n.y + headerH} stroke={c} strokeWidth="1" opacity="0.3" />
+                <text x={n.x + 8} y={n.y + 18} fontSize="13" fontWeight="700" fill={c}>{n.type}</text>
                 {n.details.map((d, di) => (
-                  <text key={di} x={n.x + 10} y={n.y + 34 + di * 14} fontSize="9" fill={GT.text3} fontFamily="'JetBrains Mono',monospace">
-                    {d.length > 35 ? d.slice(0, 35) + "..." : d}
+                  <text key={di} x={n.x + 8} y={n.y + headerH + 16 + di * 16} fontSize="11" fill="#b0b0a0">
+                    {d.length > 40 ? d.slice(0, 40) + "..." : d}
                   </text>
                 ))}
+                {/* Input/Output dots */}
+                <circle cx={n.x} cy={n.y + n.h / 2} r="4" fill={c} opacity="0.7" />
+                <circle cx={n.x + n.w} cy={n.y + n.h / 2} r="4" fill={c} opacity="0.7" />
               </g>
             );
           })}
