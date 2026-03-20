@@ -11,6 +11,7 @@ const GuideArticle = lazy(() => import("./pages/GuideArticle.jsx"));
 const PrivacyPage = lazy(() => import("./pages/PrivacyPage.jsx"));
 const TermsPage = lazy(() => import("./pages/TermsPage.jsx"));
 const AboutPage = lazy(() => import("./pages/AboutPage.jsx"));
+const ShowcasePage = lazy(() => import("./pages/ShowcasePage.jsx"));
 
 const Loading = () => (
   <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#040404", color: "#e8e4dc", fontFamily: "'DM Sans', sans-serif" }}>
@@ -29,6 +30,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/showcase" element={<ShowcasePage />} />
       </Routes>
     </Suspense>
   </BrowserRouter>

@@ -2,7 +2,6 @@ import React from "react";
 import { Link } from "react-router-dom";
 import ContentLayout from "../components/ContentLayout.jsx";
 import AdUnit from "../components/AdUnit.jsx";
-import DonationButtons from "../components/DonationButtons.jsx";
 import { THEMES } from "../theme.js";
 
 const SERIF = "'Source Serif 4','Georgia',serif";
@@ -50,19 +49,6 @@ export default function AboutPage() {
         </section>
 
         <AdUnit slot="" format="auto" />
-
-        {/* Support / Donate */}
-        <section style={{ marginBottom: 40, padding: 32, background: T.bg2, borderRadius: 16, border: `1px solid ${T.border}`, textAlign: "center" }}>
-          <h2 style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 700, marginBottom: 12, color: T.text }}>\uD504\uB85C\uC81D\uD2B8 \uD6C4\uC6D0\uD558\uAE30</h2>
-          <p style={{ fontSize: 15, color: T.text2, marginBottom: 24, maxWidth: 500, margin: "0 auto 24px" }}>
-            ComfyUI Studio\uB294 \uBB34\uB8CC\uB85C \uC6B4\uC601\uB418\uACE0 \uC788\uC2B5\uB2C8\uB2E4.
-            \uD504\uB85C\uC81D\uD2B8\uC758 \uC9C0\uC18D\uC801\uC778 \uAC1C\uBC1C\uACFC \uC6B4\uC601\uC744 \uC704\uD574 \uD6C4\uC6D0\uC744 \uBD80\uD0C1\uB4DC\uB9BD\uB2C8\uB2E4.
-          </p>
-          <DonationButtons theme={T} />
-          <p style={{ fontSize: 12, color: T.text4, marginTop: 16 }}>
-            * \uD6C4\uC6D0 \uACC4\uC815\uC740 \uC900\uBE44 \uC911\uC785\uB2C8\uB2E4. \uACE7 \uC5C5\uB370\uC774\uD2B8\uB420 \uC608\uC815\uC785\uB2C8\uB2E4.
-          </p>
-        </section>
 
         {/* Links */}
         <section style={{ marginBottom: 40 }}>

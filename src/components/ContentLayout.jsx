@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { THEMES } from "../theme.js";
-import DonationButtons from "./DonationButtons.jsx";
-
 const FONTS = "'DM Sans','Segoe UI',sans-serif";
 const SERIF = "'Source Serif 4','Georgia',serif";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Home" },
+  { to: "/showcase", label: "Showcase" },
   { to: "/guides", label: "Guides" },
   { to: "/about", label: "About" },
 ];
@@ -81,8 +79,11 @@ export default function ContentLayout({ children, title, description }) {
               </div>
             </div>
             <div>
-              <h4 style={{ fontSize: 14, marginBottom: 12, color: T.text }}>Support</h4>
-              <DonationButtons theme={T} />
+              <h4 style={{ fontSize: 14, marginBottom: 12, color: T.text }}>Community</h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <Link to="/showcase" style={{ fontSize: 13, color: T.text2, textDecoration: "none" }}>Showcase</Link>
+                <a href="https://github.com/rkdghkclgns-design/Comfyui-studio" target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: T.text2, textDecoration: "none" }}>GitHub</a>
+              </div>
             </div>
           </div>
           <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 16, textAlign: "center", fontSize: 12, color: T.text4 }}>
