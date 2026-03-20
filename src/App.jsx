@@ -2661,9 +2661,9 @@ function ShowcaseSection({ theme, lang }) {
 
   // Interactive workflow graph component with zoom/pan
   function WorkflowGraphView({ rawParsed, theme: GT, isKo: gKo }) {
-    const containerRef = useRef(null);
-    const vb = useRef(null);
-    const dragState = useRef({ active: false, sx: 0, sy: 0 });
+    const svgRef = useRef(null);
+    const [vb, setVb] = useState(null);
+    const dragRef = useRef({ active: false, sx: 0, sy: 0 });
 
     const NODE_COLORS = { "CheckpointLoaderSimple": "#2dd4a8", "CheckpointLoader": "#2dd4a8", "CLIPTextEncode": "#fbbf24", "KSampler": "#f472b6", "KSamplerAdvanced": "#f472b6", "VAEDecode": "#fb923c", "SaveImage": "#60a5fa", "EmptyLatentImage": "#22d3ee", "LoraLoader": "#a78bfa", "ControlNetApply": "#34d399", "LoadImage": "#818cf8", "VAEEncode": "#fb923c", "UpscaleLatent": "#4ade80" };
     const getColor = (t) => { for (const [k, v] of Object.entries(NODE_COLORS)) { if (t.includes(k)) return v; } return "#9ca3af"; };
@@ -2699,72 +2699,81 @@ function ShowcaseSection({ theme, lang }) {
       return nodes.length > 0 ? { nodes, links } : null;
     })();
 
-    if (!graphData) return null;
+    // Compute initial viewBox
+    const initVB = graphData ? (() => {
+      const ns = graphData.nodes;
+      return { x: Math.min(...ns.map(n => n.x)) - 50, y: Math.min(...ns.map(n => n.y)) - 50, w: Math.max(...ns.map(n => n.x + n.w)) - Math.min(...ns.map(n => n.x)) + 100, h: Math.max(...ns.map(n => n.y + n.h)) - Math.min(...ns.map(n => n.y)) + 100 };
+    })() : null;
 
-    const nodeMap = {}; graphData.nodes.forEach(n => { nodeMap[n.id] = n; });
-    const minX = Math.min(...graphData.nodes.map(n => n.x)) - 50;
-    const minY = Math.min(...graphData.nodes.map(n => n.y)) - 50;
-    const maxX = Math.max(...graphData.nodes.map(n => n.x + n.w)) + 50;
-    const maxY = Math.max(...graphData.nodes.map(n => n.y + n.h)) + 50;
-    const initVB = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+    // Initialize vb state
+    useEffect(() => { if (initVB && !vb) setVb({ ...initVB }); }, [initVB, vb]);
 
-    const updateSvgVB = () => {
-      const svg = containerRef.current?.querySelector("svg");
-      if (svg && vb.current) svg.setAttribute("viewBox", `${vb.current.x} ${vb.current.y} ${vb.current.w} ${vb.current.h}`);
-    };
-
-    const zoomBy = (factor, cx, cy) => {
-      if (!vb.current) return;
-      const v = vb.current;
-      const nw = v.w * factor; const nh = v.h * factor;
-      vb.current = { x: v.x - (nw - v.w) * cx, y: v.y - (nh - v.h) * cy, w: nw, h: nh };
-      updateSvgVB();
-    };
-
-    const setupEvents = (el) => {
-      if (!el || el._evBound) return;
-      el._evBound = true;
-      const svg = el.querySelector("svg");
+    // Wheel + drag via native events (bypass React passive listeners)
+    useEffect(() => {
+      const svg = svgRef.current;
       if (!svg) return;
-      vb.current = { ...initVB };
 
-      svg.addEventListener("wheel", (e) => {
+      const onWheel = (e) => {
         e.preventDefault();
-        e.stopPropagation();
+        const f = e.deltaY > 0 ? 1.12 : 0.89;
         const rect = svg.getBoundingClientRect();
         const mx = (e.clientX - rect.left) / rect.width;
         const my = (e.clientY - rect.top) / rect.height;
-        zoomBy(e.deltaY > 0 ? 1.12 : 0.89, mx, my);
-      }, { passive: false });
+        setVb(prev => {
+          if (!prev) return prev;
+          const nw = prev.w * f, nh = prev.h * f;
+          return { x: prev.x - (nw - prev.w) * mx, y: prev.y - (nh - prev.h) * my, w: nw, h: nh };
+        });
+      };
 
-      svg.addEventListener("mousedown", (e) => {
-        dragState.current = { active: true, sx: e.clientX, sy: e.clientY };
-        svg.style.cursor = "grabbing";
-      });
-      window.addEventListener("mousemove", (e) => {
-        if (!dragState.current.active || !vb.current) return;
+      const onDown = (e) => { dragRef.current = { active: true, sx: e.clientX, sy: e.clientY }; svg.style.cursor = "grabbing"; };
+      const onMove = (e) => {
+        if (!dragRef.current.active) return;
         const rect = svg.getBoundingClientRect();
-        const dx = (e.clientX - dragState.current.sx) * vb.current.w / rect.width;
-        const dy = (e.clientY - dragState.current.sy) * vb.current.h / rect.height;
-        vb.current = { ...vb.current, x: vb.current.x - dx, y: vb.current.y - dy };
-        dragState.current.sx = e.clientX;
-        dragState.current.sy = e.clientY;
-        updateSvgVB();
-      });
-      window.addEventListener("mouseup", () => { dragState.current.active = false; svg.style.cursor = "grab"; });
-    };
+        setVb(prev => {
+          if (!prev) return prev;
+          const dx = (e.clientX - dragRef.current.sx) * prev.w / rect.width;
+          const dy = (e.clientY - dragRef.current.sy) * prev.h / rect.height;
+          dragRef.current.sx = e.clientX;
+          dragRef.current.sy = e.clientY;
+          return { ...prev, x: prev.x - dx, y: prev.y - dy };
+        });
+      };
+      const onUp = () => { dragRef.current.active = false; svg.style.cursor = "grab"; };
+
+      svg.addEventListener("wheel", onWheel, { passive: false });
+      svg.addEventListener("mousedown", onDown);
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+      return () => {
+        svg.removeEventListener("wheel", onWheel);
+        svg.removeEventListener("mousedown", onDown);
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      };
+    }, [vb]);
+
+    if (!graphData || !vb) return null;
+
+    const nodeMap = {}; graphData.nodes.forEach(n => { nodeMap[n.id] = n; });
+
+    const doZoom = (f) => setVb(prev => {
+      if (!prev) return prev;
+      const nw = prev.w * f, nh = prev.h * f;
+      return { x: prev.x - (nw - prev.w) * 0.5, y: prev.y - (nh - prev.h) * 0.5, w: nw, h: nh };
+    });
 
     return (
-      <div ref={setupEvents} style={{ marginTop: 12, background: GT.bg2, borderRadius: 14, border: `1px solid ${GT.border}`, overflow: "hidden" }}>
+      <div style={{ marginTop: 12, background: GT.bg2, borderRadius: 14, border: `1px solid ${GT.border}`, overflow: "hidden" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 16px", borderBottom: `1px solid ${GT.border}` }}>
           <span style={{ fontSize: 10, color: GT.text4, fontWeight: 600 }}>{gKo ? "워크플로우 노드 그래프" : "Workflow Node Graph"}</span>
           <div style={{ display: "flex", gap: 4 }}>
-            <button onClick={() => zoomBy(0.7, 0.5, 0.5)} style={{ padding: "2px 8px", borderRadius: 4, border: `1px solid ${GT.border}`, background: GT.bg3, color: GT.text2, fontSize: 12, cursor: "pointer" }}>+</button>
-            <button onClick={() => zoomBy(1.4, 0.5, 0.5)} style={{ padding: "2px 8px", borderRadius: 4, border: `1px solid ${GT.border}`, background: GT.bg3, color: GT.text2, fontSize: 12, cursor: "pointer" }}>-</button>
-            <button onClick={() => { vb.current = { ...initVB }; updateSvgVB(); }} style={{ padding: "2px 8px", borderRadius: 4, border: `1px solid ${GT.border}`, background: GT.bg3, color: GT.text2, fontSize: 10, cursor: "pointer" }}>Reset</button>
+            <button onClick={() => doZoom(0.7)} style={{ padding: "2px 10px", borderRadius: 4, border: `1px solid ${GT.border}`, background: GT.bg3, color: GT.text2, fontSize: 14, cursor: "pointer", fontWeight: 700 }}>+</button>
+            <button onClick={() => doZoom(1.4)} style={{ padding: "2px 10px", borderRadius: 4, border: `1px solid ${GT.border}`, background: GT.bg3, color: GT.text2, fontSize: 14, cursor: "pointer", fontWeight: 700 }}>-</button>
+            <button onClick={() => setVb(initVB ? { ...initVB } : null)} style={{ padding: "2px 10px", borderRadius: 4, border: `1px solid ${GT.border}`, background: GT.bg3, color: GT.text2, fontSize: 10, cursor: "pointer" }}>Reset</button>
           </div>
         </div>
-        <svg viewBox={`${initVB.x} ${initVB.y} ${initVB.w} ${initVB.h}`} style={{ width: "100%", height: 420, cursor: "grab", background: "#0a0a09", touchAction: "none", display: "block" }}>
+        <svg ref={svgRef} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} style={{ width: "100%", height: 420, cursor: "grab", background: "#0a0a09", touchAction: "none", display: "block" }}>
           {graphData.links.map((lk, i) => { const s = nodeMap[lk.from], t = nodeMap[lk.to]; if (!s || !t) return null; const sx = s.x + s.w, sy = s.y + s.h / 2, tx = t.x, ty = t.y + t.h / 2, cx = Math.abs(tx - sx) * 0.4 + 30; return <path key={i} d={`M${sx},${sy} C${sx + cx},${sy} ${tx - cx},${ty} ${tx},${ty}`} fill="none" stroke={getColor(s.type)} strokeWidth="3" opacity="0.6" />; })}
           {graphData.nodes.map(n => { const c = getColor(n.type); return (
             <g key={n.id}>
