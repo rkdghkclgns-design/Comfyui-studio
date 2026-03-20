@@ -2481,6 +2481,34 @@ function ShowcaseSection({ theme, lang }) {
 
   const inputS = { width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${T.border2}`, background: T.bg3, color: T.text, fontSize: 13, fontFamily: "'DM Sans',sans-serif", outline: "none", boxSizing: "border-box" };
 
+  // Parse workflow JSON to extract preview info
+  const parseWorkflow = (jsonStr) => {
+    try {
+      const wf = JSON.parse(jsonStr);
+      const nodes = Object.values(wf);
+      const info = { model: null, steps: null, cfg: null, sampler: null, scheduler: null, width: null, height: null, seed: null, positive: null, negative: null, nodeCount: nodes.length };
+      for (const n of nodes) {
+        const ct = n.class_type || "";
+        const inp = n.inputs || {};
+        if (ct.includes("CheckpointLoader")) info.model = inp.ckpt_name || null;
+        if (ct === "KSampler" || ct === "KSamplerAdvanced") { info.steps = inp.steps; info.cfg = inp.cfg; info.sampler = inp.sampler_name; info.scheduler = inp.scheduler; info.seed = inp.seed; }
+        if (ct === "EmptyLatentImage" || ct === "EmptySD3LatentImage") { info.width = inp.width; info.height = inp.height; }
+        if (ct === "CLIPTextEncode") { const txt = inp.text || ""; if (!info.positive) info.positive = txt; else if (!info.negative) info.negative = txt; }
+      }
+      return info;
+    } catch { return null; }
+  };
+
+  const wfPreview = formData.workflow_json.trim() ? parseWorkflow(formData.workflow_json) : null;
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => { setFormData(p => ({ ...p, workflow_json: ev.target.result })); };
+    reader.readAsText(file);
+  };
+
   return (
     <div style={{ marginTop: 48, padding: "32px 0", borderTop: `1px solid ${T.border}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
@@ -2511,7 +2539,44 @@ function ShowcaseSection({ theme, lang }) {
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <input value={formData.title} onChange={e => setFormData(p => ({ ...p, title: e.target.value }))} placeholder={isKo ? "제목" : "Title"} maxLength={100} style={inputS} />
               <textarea value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} placeholder={isKo ? "설명 (선택)" : "Description (optional)"} rows={2} maxLength={500} style={{ ...inputS, resize: "vertical" }} />
-              <textarea value={formData.workflow_json} onChange={e => setFormData(p => ({ ...p, workflow_json: e.target.value }))} placeholder="Workflow JSON" rows={5} style={{ ...inputS, fontFamily: "'JetBrains Mono',monospace", fontSize: 11, resize: "vertical" }} />
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+                <label style={{ flex: 1, padding: "8px 14px", borderRadius: 8, border: `1px dashed ${T.border2}`, background: T.bg3, color: T.text2, fontSize: 11, textAlign: "center", cursor: "pointer" }}>
+                  {isKo ? "JSON 파일 첨부" : "Upload JSON file"}
+                  <input type="file" accept=".json,application/json" onChange={handleFileUpload} style={{ display: "none" }} />
+                </label>
+                <span style={{ fontSize: 10, color: T.text4 }}>{isKo ? "또는 아래에 직접 입력" : "or paste below"}</span>
+              </div>
+              <textarea value={formData.workflow_json} onChange={e => setFormData(p => ({ ...p, workflow_json: e.target.value }))} placeholder="Workflow JSON" rows={4} style={{ ...inputS, fontFamily: "'JetBrains Mono',monospace", fontSize: 11, resize: "vertical" }} />
+              {/* Workflow Preview */}
+              {wfPreview && (
+                <div style={{ marginTop: 8, padding: 14, background: T.bg, borderRadius: 10, border: `1px solid ${T.accent}30` }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: T.accent, marginBottom: 10 }}>{isKo ? "워크플로우 미리보기" : "Workflow Preview"}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    {wfPreview.model && <div style={{ gridColumn: "1 / -1", padding: "8px 12px", background: T.bg2, borderRadius: 8, border: `1px solid ${T.border}` }}>
+                      <span style={{ fontSize: 10, color: T.text4 }}>{isKo ? "모델" : "Model"}</span>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: T.text, marginTop: 2, wordBreak: "break-all" }}>{wfPreview.model}</div>
+                    </div>}
+                    {[
+                      [isKo ? "스텝" : "Steps", wfPreview.steps],
+                      ["CFG", wfPreview.cfg],
+                      [isKo ? "샘플러" : "Sampler", wfPreview.sampler],
+                      [isKo ? "스케줄러" : "Scheduler", wfPreview.scheduler],
+                      [isKo ? "해상도" : "Resolution", wfPreview.width && wfPreview.height ? `${wfPreview.width} x ${wfPreview.height}` : null],
+                      ["Seed", wfPreview.seed],
+                    ].filter(([, v]) => v != null).map(([label, val]) => (
+                      <div key={label} style={{ padding: "6px 10px", background: T.bg2, borderRadius: 8, border: `1px solid ${T.border}` }}>
+                        <span style={{ fontSize: 9, color: T.text4 }}>{label}</span>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: T.text, marginTop: 1 }}>{String(val)}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {wfPreview.positive && <div style={{ marginTop: 8, padding: "8px 10px", background: T.bg2, borderRadius: 8, border: `1px solid ${T.border}` }}>
+                    <span style={{ fontSize: 9, color: T.text4 }}>{isKo ? "프롬프트" : "Prompt"}</span>
+                    <div style={{ fontSize: 10, color: T.text2, marginTop: 2, lineHeight: 1.5, maxHeight: 60, overflow: "hidden" }}>{wfPreview.positive}</div>
+                  </div>}
+                  <div style={{ marginTop: 6, fontSize: 9, color: T.text4 }}>{isKo ? `노드 ${wfPreview.nodeCount}개 감지` : `${wfPreview.nodeCount} nodes detected`}</div>
+                </div>
+              )}
               <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                 {TAG_OPTIONS.map(tag => (
                   <button key={tag} type="button" onClick={() => setFormData(p => ({ ...p, tags: p.tags.includes(tag) ? p.tags.filter(t => t !== tag) : [...p.tags, tag] }))} style={{
@@ -2549,6 +2614,33 @@ function ShowcaseSection({ theme, lang }) {
             </div>
             {selectedPost.description && <p style={{ fontSize: 13, color: T.text2, marginBottom: 14, lineHeight: 1.6 }}>{selectedPost.description}</p>}
             {selectedPost.tags?.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 14 }}>{selectedPost.tags.map(t => <span key={t} style={{ padding: "2px 8px", borderRadius: 16, fontSize: 10, background: `${T.accent}15`, color: T.accent, border: `1px solid ${T.accent}30` }}>{t}</span>)}</div>}
+            {/* Workflow Info Preview */}
+            {(() => { const info = parseWorkflow(selectedPost.workflow_json); if (!info) return null; return (
+              <div style={{ marginBottom: 14, padding: 14, background: T.bg, borderRadius: 10, border: `1px solid ${T.accent}30` }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: T.accent, marginBottom: 10 }}>{isKo ? "워크플로우 정보" : "Workflow Info"}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                  {info.model && <div style={{ gridColumn: "1 / -1", padding: "6px 10px", background: T.bg2, borderRadius: 8, border: `1px solid ${T.border}` }}>
+                    <span style={{ fontSize: 9, color: T.text4 }}>{isKo ? "모델" : "Model"}</span>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: T.text, marginTop: 1, wordBreak: "break-all" }}>{info.model}</div>
+                  </div>}
+                  {[[isKo ? "스텝" : "Steps", info.steps], ["CFG", info.cfg], [isKo ? "샘플러" : "Sampler", info.sampler], [isKo ? "스케줄러" : "Scheduler", info.scheduler], [isKo ? "해상도" : "Resolution", info.width && info.height ? `${info.width} x ${info.height}` : null], ["Seed", info.seed]].filter(([, v]) => v != null).map(([l, v]) => (
+                    <div key={l} style={{ padding: "5px 10px", background: T.bg2, borderRadius: 8, border: `1px solid ${T.border}` }}>
+                      <span style={{ fontSize: 9, color: T.text4 }}>{l}</span>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: T.text, marginTop: 1 }}>{String(v)}</div>
+                    </div>
+                  ))}
+                </div>
+                {info.positive && <div style={{ marginTop: 6, padding: "6px 10px", background: T.bg2, borderRadius: 8, border: `1px solid ${T.border}` }}>
+                  <span style={{ fontSize: 9, color: T.text4 }}>{isKo ? "프롬프트" : "Prompt"}</span>
+                  <div style={{ fontSize: 10, color: T.text2, marginTop: 2, lineHeight: 1.5 }}>{info.positive}</div>
+                </div>}
+                {info.negative && <div style={{ marginTop: 4, padding: "6px 10px", background: T.bg2, borderRadius: 8, border: `1px solid #e5555530` }}>
+                  <span style={{ fontSize: 9, color: "#e55" }}>Negative</span>
+                  <div style={{ fontSize: 10, color: T.text3, marginTop: 2, lineHeight: 1.5 }}>{info.negative}</div>
+                </div>}
+                <div style={{ marginTop: 4, fontSize: 9, color: T.text4 }}>{isKo ? `노드 ${info.nodeCount}개` : `${info.nodeCount} nodes`}</div>
+              </div>
+            ); })()}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
               <span style={{ fontSize: 12, color: T.text2, fontWeight: 600 }}>Workflow JSON</span>
               <button onClick={() => copyJSON(selectedPost.workflow_json)} style={{ padding: "3px 10px", borderRadius: 6, border: `1px solid ${T.border}`, background: T.bg3, color: T.text2, fontSize: 11, cursor: "pointer" }}>{isKo ? "복사" : "Copy"}</button>
