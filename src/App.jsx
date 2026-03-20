@@ -2543,8 +2543,10 @@ function ShowcaseSection({ theme, lang }) {
         {info.model && (
           <div style={{ ...box, marginBottom: 12 }}>
             <span style={label}>{isKo ? "✓ 모델 파일명" : "✓ Model Filename"}</span>
-            <div style={{ ...val, fontSize: 15, ...mono }}>{info.model}</div>
-            <div style={{ fontSize: 10, color: T.text4, marginTop: 6 }}>ComfyUI models/checkpoints/ {isKo ? "폴더의 실제 파일명" : "actual filename"}</div>
+            <a href={`https://civitai.com/search/models?sortBy=models_v9&query=${encodeURIComponent(info.model.replace(/\.(safetensors|ckpt|pt|bin)$/i, "").replace(/[-_]/g, " "))}`} target="_blank" rel="noopener noreferrer" style={{ ...val, fontSize: 15, ...mono, display: "block", color: T.accent, textDecoration: "none", cursor: "pointer" }}>
+              {info.model} <span style={{ fontSize: 10, opacity: 0.7 }}>↗</span>
+            </a>
+            <div style={{ fontSize: 10, color: T.text4, marginTop: 6 }}>{isKo ? "클릭하면 Civitai에서 모델을 검색합니다" : "Click to search this model on Civitai"}</div>
           </div>
         )}
 
