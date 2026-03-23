@@ -65,7 +65,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <AdUnit slot="" format="auto" />
+      <AdUnit slot="8326910361" format="auto" />
 
       {/* How it works */}
       <section style={{ padding: "40px 0" }}>

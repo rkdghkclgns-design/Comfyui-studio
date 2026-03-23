@@ -235,7 +235,7 @@ export default function ShowcasePage() {
           </div>
         )}
 
-        <AdUnit slot="" format="auto" />
+        <AdUnit slot="8326910361" format="auto" />
 
         {/* Posts Grid */}
         {loading ? (

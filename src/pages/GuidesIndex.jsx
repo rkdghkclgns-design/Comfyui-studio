@@ -36,7 +36,7 @@ export default function GuidesIndex() {
           ))}
         </div>
 
-        <AdUnit slot="" format="auto" />
+        <AdUnit slot="8326910361" format="auto" />
 
         <div style={{ textAlign: "center", marginTop: 40, padding: "32px", background: T.bg2, borderRadius: 16, border: `1px solid ${T.border}` }}>
           <h3 style={{ fontFamily: SERIF, fontSize: 20, marginBottom: 12, color: T.text }}>\uC9C0\uAE08 \uBC14\uB85C \uC2DC\uC791\uD558\uC138\uC694</h3>

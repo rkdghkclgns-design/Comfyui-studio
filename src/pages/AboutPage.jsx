@@ -48,7 +48,7 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <AdUnit slot="" format="auto" />
+        <AdUnit slot="8326910361" format="auto" />
 
         {/* Links */}
         <section style={{ marginBottom: 40 }}>

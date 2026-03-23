@@ -47,11 +47,11 @@ export default function GuideArticle() {
               <h2 style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 700, marginBottom: 16, color: T.text, paddingTop: 16 }}>{s.heading}</h2>
               <div style={{ fontSize: 15, color: T.text2, lineHeight: 1.8, whiteSpace: "pre-line" }}>{s.content}</div>
             </section>
-            {i === 0 && <AdUnit slot="" format="auto" />}
+            {i === 0 && <AdUnit slot="8326910361" format="auto" />}
           </React.Fragment>
         ))}
 
-        <AdUnit slot="" format="auto" />
+        <AdUnit slot="8326910361" format="auto" />
 
         {/* Related Guides */}
         {otherGuides.length > 0 && (
