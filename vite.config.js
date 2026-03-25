@@ -46,7 +46,7 @@ export default defineConfig({
         stringArray: true,
         stringArrayCallsTransform: true,
         stringArrayCallsTransformThreshold: 0.75,
-        stringArrayEncoding: ["rc4"],
+        stringArrayEncoding: ["base64"],
         stringArrayIndexesType: ["hexadecimal-number"],
         stringArrayIndexShift: true,
         stringArrayRotate: true,
