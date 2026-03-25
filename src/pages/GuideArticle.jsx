@@ -21,7 +21,7 @@ export default function GuideArticle() {
       <article style={{ maxWidth: 720, margin: "0 auto", padding: "40px 0" }}>
         {/* Header */}
         <div style={{ marginBottom: 32 }}>
-          <Link to="/guides" style={{ fontSize: 13, color: T.accent, textDecoration: "none", fontWeight: 500 }}>&larr; \uAC00\uC774\uB4DC \uBAA9\uB85D</Link>
+          <Link to="/guides" style={{ fontSize: 13, color: T.accent, textDecoration: "none", fontWeight: 500 }}>&larr; 가이드 목록</Link>
           <span style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.accent, textTransform: "uppercase", marginTop: 16, marginBottom: 8 }}>{guide.category}</span>
           <h1 style={{ fontFamily: SERIF, fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, lineHeight: 1.3, marginBottom: 12, color: T.text }}>{guide.title}</h1>
           <p style={{ fontSize: 16, color: T.text2, lineHeight: 1.7, marginBottom: 8 }}>{guide.description}</p>
@@ -30,7 +30,7 @@ export default function GuideArticle() {
 
         {/* Table of Contents */}
         <nav style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, marginBottom: 32 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: T.text }}>\uBAA9\uCC28</h3>
+          <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: T.text }}>목차</h3>
           <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
             {guide.sections.map((s, i) => (
               <li key={i}>
@@ -56,7 +56,7 @@ export default function GuideArticle() {
         {/* Related Guides */}
         {otherGuides.length > 0 && (
           <section style={{ marginTop: 48, paddingTop: 32, borderTop: `1px solid ${T.border}` }}>
-            <h3 style={{ fontFamily: SERIF, fontSize: 20, marginBottom: 20, color: T.text }}>\uAD00\uB828 \uAC00\uC774\uB4DC</h3>
+            <h3 style={{ fontFamily: SERIF, fontSize: 20, marginBottom: 20, color: T.text }}>관련 가이드</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {otherGuides.map(g => (
                 <Link key={g.slug} to={`/guides/${g.slug}`} style={{
@@ -76,12 +76,12 @@ export default function GuideArticle() {
 
         {/* CTA */}
         <div style={{ textAlign: "center", marginTop: 48, padding: 32, background: T.bg2, borderRadius: 16, border: `1px solid ${T.border}` }}>
-          <h3 style={{ fontFamily: SERIF, fontSize: 20, marginBottom: 12, color: T.text }}>ComfyUI Studio\uB85C \uBC14\uB85C \uC2DC\uC791\uD558\uC138\uC694</h3>
-          <p style={{ fontSize: 14, color: T.text2, marginBottom: 20 }}>\uBCF5\uC7A1\uD55C \uC124\uC815 \uC5C6\uC774 AI\uAC00 \uC6CC\uD06C\uD50C\uB85C\uC6B0\uB97C \uC790\uB3D9\uC73C\uB85C \uC0DD\uC131\uD574\uC90D\uB2C8\uB2E4.</p>
+          <h3 style={{ fontFamily: SERIF, fontSize: 20, marginBottom: 12, color: T.text }}>ComfyUI Studio로 바로 시작하세요</h3>
+          <p style={{ fontSize: 14, color: T.text2, marginBottom: 20 }}>복잡한 설정 없이 AI가 워크플로우를 자동으로 생성해줍니다.</p>
           <Link to="/" style={{
             display: "inline-block", padding: "12px 32px", borderRadius: 10, fontSize: 15, fontWeight: 700,
             background: T.accent2, color: "#fff", textDecoration: "none",
-          }}>ComfyUI Studio \uC5F4\uAE30 &rarr;</Link>
+          }}>ComfyUI Studio 열기 &rarr;</Link>
         </div>
       </article>
     </ContentLayout>

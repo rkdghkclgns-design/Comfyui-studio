@@ -49,7 +49,7 @@ export default function ContentLayout({ children, title, description }) {
             }}>Open App</Link>
             <button onClick={toggleTheme} style={{
               background: "none", border: "none", cursor: "pointer", fontSize: 18, padding: "4px 8px", color: T.text2,
-            }}>{theme === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19"}</button>
+            }}>{theme === "dark" ? "☀️" : "🌙"}</button>
           </nav>
         </div>
       </header>

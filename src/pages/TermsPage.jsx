@@ -10,65 +10,65 @@ export default function TermsPage() {
   const p = { fontSize: 15, color: T.text2, lineHeight: 1.8, marginBottom: 16 };
 
   return (
-    <ContentLayout title="\uC774\uC6A9\uC57D\uAD00" description="ComfyUI Studio \uC774\uC6A9\uC57D\uAD00">
+    <ContentLayout title="이용약관" description="ComfyUI Studio 이용약관">
       <article style={{ maxWidth: 720, margin: "0 auto", padding: "40px 0" }}>
-        <h1 style={{ fontFamily: SERIF, fontSize: 36, fontWeight: 800, marginBottom: 12, color: T.text }}>\uC774\uC6A9\uC57D\uAD00</h1>
-        <p style={{ fontSize: 13, color: T.text4, marginBottom: 32 }}>\uCD5C\uC885 \uC218\uC815\uC77C: 2026\uB144 3\uC6D4 20\uC77C</p>
+        <h1 style={{ fontFamily: SERIF, fontSize: 36, fontWeight: 800, marginBottom: 12, color: T.text }}>이용약관</h1>
+        <p style={{ fontSize: 13, color: T.text4, marginBottom: 32 }}>최종 수정일: 2026년 3월 20일</p>
 
-        <h2 style={h2}>1. \uC11C\uBE44\uC2A4 \uAC1C\uC694</h2>
+        <h2 style={h2}>1. 서비스 개요</h2>
         <p style={p}>
-          ComfyUI Studio(\uC774\uD558 "\uC11C\uBE44\uC2A4")\uB294 AI \uC774\uBBF8\uC9C0 \uC0DD\uC131\uC744 \uC704\uD55C ComfyUI \uC6CC\uD06C\uD50C\uB85C\uC6B0\uB97C
-          \uC790\uB3D9\uC73C\uB85C \uC0DD\uC131\uD574\uC8FC\uB294 \uBB34\uB8CC \uC6F9 \uAE30\uBC18 \uB3C4\uAD6C\uC785\uB2C8\uB2E4.
-          \uBCF8 \uC11C\uBE44\uC2A4\uB97C \uC0AC\uC6A9\uD568\uC73C\uB85C\uC368 \uBCF8 \uC57D\uAD00\uC5D0 \uB3D9\uC758\uD558\uB294 \uAC83\uC73C\uB85C \uAC04\uC8FC\uD569\uB2C8\uB2E4.
+          ComfyUI Studio(이하 "서비스")는 AI 이미지 생성을 위한 ComfyUI 워크플로우를
+          자동으로 생성해주는 무료 웹 기반 도구입니다.
+          본 서비스를 사용함으로써 본 약관에 동의하는 것으로 간주합니다.
         </p>
 
-        <h2 style={h2}>2. \uC774\uC6A9 \uC870\uAC74</h2>
+        <h2 style={h2}>2. 이용 조건</h2>
         <p style={p}>
-          \uC11C\uBE44\uC2A4\uB294 \uBB34\uB8CC\uB85C \uC81C\uACF5\uB418\uBA70, \uBCC4\uB3C4\uC758 \uD68C\uC6D0\uAC00\uC785 \uC5C6\uC774 \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.
-          \uB2E4\uB9CC, \uB2E4\uC74C\uC758 \uD589\uC704\uB294 \uAE08\uC9C0\uB429\uB2C8\uB2E4:
-        </p>
-        <ul style={{ ...p, paddingLeft: 24 }}>
-          <li>\uC11C\uBE44\uC2A4\uB97C \uC774\uC6A9\uD55C \uBD88\uBC95\uC801\uC778 \uCF58\uD150\uCE20 \uC0DD\uC131</li>
-          <li>\uC11C\uBE44\uC2A4\uC758 \uC815\uC0C1\uC801\uC778 \uC6B4\uC601\uC744 \uBC29\uD574\uD558\uB294 \uD589\uC704</li>
-          <li>API\uB97C \uBE44\uC815\uC0C1\uC801\uC73C\uB85C \uACFC\uB3C4\uD558\uAC8C \uD638\uCD9C\uD558\uB294 \uD589\uC704</li>
-          <li>\uC11C\uBE44\uC2A4\uC758 \uCF54\uB4DC\uB97C \uBB34\uB2E8\uC73C\uB85C \uBCF5\uC81C\uD558\uC5EC \uC0C1\uC5C5\uC801\uC73C\uB85C \uC774\uC6A9\uD558\uB294 \uD589\uC704</li>
-        </ul>
-
-        <h2 style={h2}>3. \uC0DD\uC131\uB41C \uCF58\uD150\uCE20\uC5D0 \uB300\uD55C \uCC45\uC784</h2>
-        <p style={p}>
-          \uC11C\uBE44\uC2A4\uB97C \uD1B5\uD574 \uC0DD\uC131\uB41C \uC6CC\uD06C\uD50C\uB85C\uC6B0 \uBC0F \uC774\uBBF8\uC9C0\uC5D0 \uB300\uD55C \uCC45\uC784\uC740 \uC0AC\uC6A9\uC790\uC5D0\uAC8C \uC788\uC2B5\uB2C8\uB2E4.
-          AI\uB85C \uC0DD\uC131\uB41C \uCF58\uD150\uCE20\uB294 \uC800\uC791\uAD8C, \uCD08\uC0C1\uAD8C \uB4F1 \uBC95\uC801 \uBB38\uC81C\uAC00 \uBC1C\uC0DD\uD560 \uC218 \uC788\uC73C\uBA70,
-          \uC774\uC5D0 \uB300\uD55C \uCC45\uC784\uC740 \uC0AC\uC6A9\uC790\uC5D0\uAC8C \uC788\uC2B5\uB2C8\uB2E4.
-        </p>
-
-        <h2 style={h2}>4. \uBA74\uCC45 \uC870\uD56D</h2>
-        <p style={p}>
-          \uC11C\uBE44\uC2A4\uB294 "\uC788\uB294 \uADF8\uB300\uB85C" \uC81C\uACF5\uB418\uBA70, \uBE44\uD2B8\uC758 \uC544\uBB34\uB7F0 \uBCF4\uC99D\uC744 \uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.
-          \uC11C\uBE44\uC2A4 \uC0AC\uC6A9\uC73C\uB85C \uC778\uD55C \uC190\uD574\uC5D0 \uB300\uD574 \uCC45\uC784\uC744 \uC9C0\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.
-          \uC774\uC5D0\uB294 \uB2E4\uC74C\uC774 \uD3EC\uD568\uB418\uC9C0\uB9CC \uC774\uC5D0 \uAD6D\uD55C\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4:
+          서비스는 무료로 제공되며, 별도의 회원가입 없이 사용할 수 있습니다.
+          다만, 다음의 행위는 금지됩니다:
         </p>
         <ul style={{ ...p, paddingLeft: 24 }}>
-          <li>\uC11C\uBE44\uC2A4 \uC911\uB2E8\uC774\uB098 \uC624\uB958\uB85C \uC778\uD55C \uC190\uD574</li>
-          <li>\uC0DD\uC131\uB41C \uC6CC\uD06C\uD50C\uB85C\uC6B0\uC758 \uBD80\uC815\uD655\uC131\uC73C\uB85C \uC778\uD55C \uC190\uD574</li>
-          <li>AI \uBAA8\uB378\uC758 \uD55C\uACC4\uB85C \uC778\uD55C \uBB38\uC81C</li>
+          <li>서비스를 이용한 불법적인 콘텐츠 생성</li>
+          <li>서비스의 정상적인 운영을 방해하는 행위</li>
+          <li>API를 비정상적으로 과도하게 호출하는 행위</li>
+          <li>서비스의 코드를 무단으로 복제하여 상업적으로 이용하는 행위</li>
         </ul>
 
-        <h2 style={h2}>5. \uC9C0\uC801\uC7AC\uC0B0\uAD8C</h2>
+        <h2 style={h2}>3. 생성된 콘텐츠에 대한 책임</h2>
         <p style={p}>
-          ComfyUI Studio\uC758 \uC18C\uC2A4 \uCF54\uB4DC, \uB514\uC790\uC778, \uCF58\uD150\uCE20\uC5D0 \uB300\uD55C \uC9C0\uC801\uC7AC\uC0B0\uAD8C\uC740
-          \uC11C\uBE44\uC2A4 \uC6B4\uC601\uC790\uC5D0\uAC8C \uC788\uC2B5\uB2C8\uB2E4. \uC0AC\uC6A9\uC790\uAC00 \uC0DD\uC131\uD55C \uC6CC\uD06C\uD50C\uB85C\uC6B0\uC758
-          \uC0AC\uC6A9 \uAD8C\uD55C\uC740 \uC0AC\uC6A9\uC790\uC5D0\uAC8C \uC788\uC2B5\uB2C8\uB2E4.
+          서비스를 통해 생성된 워크플로우 및 이미지에 대한 책임은 사용자에게 있습니다.
+          AI로 생성된 콘텐츠는 저작권, 초상권 등 법적 문제가 발생할 수 있으며,
+          이에 대한 책임은 사용자에게 있습니다.
         </p>
 
-        <h2 style={h2}>6. \uC57D\uAD00 \uBCC0\uACBD</h2>
+        <h2 style={h2}>4. 면책 조항</h2>
         <p style={p}>
-          \uBCF8 \uC57D\uAD00\uC740 \uC0AC\uC804 \uACF5\uC9C0 \uC5C6\uC774 \uBCC0\uACBD\uB420 \uC218 \uC788\uC73C\uBA70,
-          \uBCC0\uACBD\uB41C \uC57D\uAD00\uC740 \uBCF8 \uD398\uC774\uC9C0\uC5D0 \uAC8C\uC2DC\uB41C \uC2DC\uC810\uBD80\uD130 \uD6A8\uB825\uC774 \uBC1C\uC0DD\uD569\uB2C8\uB2E4.
+          서비스는 "있는 그대로" 제공되며, 비트의 아무런 보증을 하지 않습니다.
+          서비스 사용으로 인한 손해에 대해 책임을 지지 않습니다.
+          이에는 다음이 포함되지만 이에 국한되지 않습니다:
+        </p>
+        <ul style={{ ...p, paddingLeft: 24 }}>
+          <li>서비스 중단이나 오류로 인한 손해</li>
+          <li>생성된 워크플로우의 부정확성으로 인한 손해</li>
+          <li>AI 모델의 한계로 인한 문제</li>
+        </ul>
+
+        <h2 style={h2}>5. 지적재산권</h2>
+        <p style={p}>
+          ComfyUI Studio의 소스 코드, 디자인, 콘텐츠에 대한 지적재산권은
+          서비스 운영자에게 있습니다. 사용자가 생성한 워크플로우의
+          사용 권한은 사용자에게 있습니다.
         </p>
 
-        <h2 style={h2}>7. \uBB38\uC758</h2>
+        <h2 style={h2}>6. 약관 변경</h2>
         <p style={p}>
-          \uC57D\uAD00\uC5D0 \uB300\uD55C \uBB38\uC758\uB294 GitHub \uC800\uC7A5\uC18C\uC758 Issues\uB97C \uD1B5\uD574 \uC811\uC218\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.
+          본 약관은 사전 공지 없이 변경될 수 있으며,
+          변경된 약관은 본 페이지에 게시된 시점부터 효력이 발생합니다.
+        </p>
+
+        <h2 style={h2}>7. 문의</h2>
+        <p style={p}>
+          약관에 대한 문의는 GitHub 저장소의 Issues를 통해 접수할 수 있습니다.
         </p>
       </article>
     </ContentLayout>

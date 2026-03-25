@@ -121,13 +121,13 @@ export default function ShowcasePage() {
   const inputStyle = { width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${T.border2}`, background: T.bg3, color: T.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none", boxSizing: "border-box" };
 
   return (
-    <ContentLayout title="Showcase" description="ComfyUI Studio \uCEE4\uBBA4\uB2C8\uD2F0 \uC6CC\uD06C\uD50C\uB85C\uC6B0 \uAC8C\uC2DC\uD310">
+    <ContentLayout title="Showcase" description="ComfyUI Studio 커뮤니티 워크플로우 게시판">
       <section style={{ padding: "40px 0" }}>
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16, marginBottom: 32 }}>
           <div>
             <h1 style={{ fontFamily: SERIF, fontSize: 36, fontWeight: 800, marginBottom: 8, color: T.text }}>Showcase</h1>
-            <p style={{ fontSize: 15, color: T.text2, margin: 0 }}>\uB098\uC758 ComfyUI \uC6CC\uD06C\uD50C\uB85C\uC6B0\uB97C \uACF5\uC720\uD558\uACE0 \uB2E4\uB978 \uC0AC\uB78C\uB4E4\uC758 \uC6CC\uD06C\uD50C\uB85C\uC6B0\uB97C \uD0D0\uC0C9\uD558\uC138\uC694.</p>
+            <p style={{ fontSize: 15, color: T.text2, margin: 0 }}>나의 ComfyUI 워크플로우를 공유하고 다른 사람들의 워크플로우를 탐색하세요.</p>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {user ? (
