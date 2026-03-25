@@ -28,6 +28,18 @@ export default defineConfig({
   plugins: [
     react(),
     viteObfuscateFile({
+      exclude: [
+        /LandingPage/,
+        /GuidesIndex/,
+        /GuideArticle/,
+        /AboutPage/,
+        /PrivacyPage/,
+        /TermsPage/,
+        /ShowcasePage/,
+        /ContentLayout/,
+        /AdUnit/,
+        /guides/,
+      ],
       options: {
         compact: true,
         controlFlowFlattening: true,
@@ -41,12 +53,11 @@ export default defineConfig({
         renameGlobals: false,
         selfDefending: true,
         simplify: true,
-        splitStrings: true,
-        splitStringsChunkLength: 3,
+        splitStrings: false,
         stringArray: true,
         stringArrayCallsTransform: true,
         stringArrayCallsTransformThreshold: 0.75,
-        stringArrayEncoding: ["base64"],
+        stringArrayEncoding: [],
         stringArrayIndexesType: ["hexadecimal-number"],
         stringArrayIndexShift: true,
         stringArrayRotate: true,
