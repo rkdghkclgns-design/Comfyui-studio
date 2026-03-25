@@ -57,7 +57,7 @@ export default defineConfig({
         stringArrayWrappersType: "function",
         stringArrayThreshold: 1,
         transformObjectKeys: true,
-        unicodeEscapeSequence: true,
+        unicodeEscapeSequence: false,
       },
     }),
     prerender({
@@ -71,6 +71,10 @@ export default defineConfig({
         if (!renderedRoute.html.includes('<meta charset')) {
           renderedRoute.html = renderedRoute.html.replace('<head>', '<head><meta charset="UTF-8">');
         }
+        // Decode unicode escape sequences to actual characters (Korean, emoji, etc.)
+        renderedRoute.html = renderedRoute.html.replace(/\\u([0-9A-Fa-f]{4})/g, (_, hex) =>
+          String.fromCharCode(parseInt(hex, 16))
+        );
       },
     }),
   ],
