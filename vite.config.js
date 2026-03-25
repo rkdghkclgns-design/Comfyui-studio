@@ -1,6 +1,28 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { viteObfuscateFile } from "vite-plugin-obfuscator";
+import prerender from "@prerenderer/rollup-plugin";
+import PuppeteerRenderer from "@prerenderer/renderer-puppeteer";
+
+const prerenderRoutes = [
+  "/landing",
+  "/guides",
+  "/guides/comfyui-beginners-guide",
+  "/guides/comfyui-workflow-guide",
+  "/guides/comfyui-model-guide",
+  "/guides/comfyui-vs-a1111",
+  "/guides/controlnet-complete-guide",
+  "/guides/lora-usage-guide",
+  "/guides/vram-optimization-guide",
+  "/guides/flux-model-guide",
+  "/guides/comfyui-video-guide",
+  "/guides/comfyui-custom-nodes",
+  "/guides/comfyui-prompt-engineering",
+  "/showcase",
+  "/about",
+  "/privacy",
+  "/terms",
+];
 
 export default defineConfig({
   plugins: [
@@ -36,6 +58,19 @@ export default defineConfig({
         stringArrayThreshold: 1,
         transformObjectKeys: true,
         unicodeEscapeSequence: true,
+      },
+    }),
+    prerender({
+      routes: prerenderRoutes,
+      renderer: new PuppeteerRenderer({
+        renderAfterTime: 3000,
+        headless: true,
+      }),
+      postProcess(renderedRoute) {
+        // Inject meta charset for proper Korean encoding
+        if (!renderedRoute.html.includes('<meta charset')) {
+          renderedRoute.html = renderedRoute.html.replace('<head>', '<head><meta charset="UTF-8">');
+        }
       },
     }),
   ],
