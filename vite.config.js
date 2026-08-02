@@ -18,7 +18,9 @@ const prerenderRoutes = [
   "/guides/comfyui-video-guide",
   "/guides/comfyui-custom-nodes",
   "/guides/comfyui-prompt-engineering",
-  "/showcase",
+  // "/showcase" is intentionally NOT prerendered: it renders user-submitted posts,
+  // which would be frozen into static HTML until the next deploy (a deleted post
+  // would keep serving) and cannot be moderated between builds.
   "/about",
   "/privacy",
   "/terms",
@@ -40,34 +42,32 @@ export default defineConfig({
         /AdUnit/,
         /guides/,
       ],
+      // Obfuscation raises the cost of casual reading; it cannot keep a secret.
+      // Anything that must stay secret lives behind the Edge Function, not in here.
+      // The aggressive options previously enabled (debugProtection's 2s interval,
+      // selfDefending, deadCodeInjection, controlFlowFlattening at 0.75 over a
+      // 4k-line file) cost real CPU and bundle size — which AdSense revenue tracks
+      // via Core Web Vitals — while disableConsoleOutput removed the only way to
+      // observe production failures.
       options: {
         compact: true,
-        controlFlowFlattening: true,
-        controlFlowFlatteningThreshold: 0.75,
-        deadCodeInjection: true,
-        deadCodeInjectionThreshold: 0.4,
-        debugProtection: true,
-        debugProtectionInterval: 2000,
-        disableConsoleOutput: true,
+        controlFlowFlattening: false,
+        deadCodeInjection: false,
+        debugProtection: false,
+        disableConsoleOutput: false,
         identifierNamesGenerator: "hexadecimal",
         renameGlobals: false,
-        selfDefending: true,
+        selfDefending: false,
         simplify: true,
         splitStrings: false,
         stringArray: true,
-        stringArrayCallsTransform: true,
-        stringArrayCallsTransformThreshold: 0.75,
+        stringArrayCallsTransform: false,
         stringArrayEncoding: [],
         stringArrayIndexesType: ["hexadecimal-number"],
-        stringArrayIndexShift: true,
         stringArrayRotate: true,
         stringArrayShuffle: true,
-        stringArrayWrappersCount: 3,
-        stringArrayWrappersChainedCalls: true,
-        stringArrayWrappersParametersMaxCount: 4,
-        stringArrayWrappersType: "function",
-        stringArrayThreshold: 1,
-        transformObjectKeys: true,
+        stringArrayThreshold: 0.75,
+        transformObjectKeys: false,
         unicodeEscapeSequence: false,
       },
     }),
@@ -76,6 +76,10 @@ export default defineConfig({
       renderer: new PuppeteerRenderer({
         renderAfterTime: 3000,
         headless: true,
+        // AdUnit checks this flag and renders a placeholder instead of a live ad,
+        // so no loaded ad is serialized into the static HTML.
+        inject: {},
+        injectProperty: "__PRERENDER_INJECTED",
       }),
       postProcess(renderedRoute) {
         // Inject meta charset for proper Korean encoding
@@ -86,6 +90,12 @@ export default defineConfig({
         renderedRoute.html = renderedRoute.html.replace(/\\u([0-9A-Fa-f]{4})/g, (_, hex) =>
           String.fromCharCode(parseInt(hex, 16))
         );
+        // Belt-and-braces: strip any AdSense artifacts that still made it into the
+        // snapshot, so the live page always owns the ad lifecycle.
+        renderedRoute.html = renderedRoute.html
+          .replace(/<script[^>]*pagead2\.googlesyndication\.com[^>]*>\s*<\/script>/g, "")
+          .replace(/\sdata-adsbygoogle-status="[^"]*"/g, "")
+          .replace(/\sdata-ad-status="[^"]*"/g, "");
       },
     }),
   ],

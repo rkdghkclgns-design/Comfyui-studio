@@ -1,7 +1,16 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 const AD_CLIENT = "ca-pub-2318294479713516";
 let scriptLoaded = false;
+
+// Prerendering runs the app in headless Chrome at build time. If ads render there,
+// the loaded <ins data-adsbygoogle-status="done"> is serialized into the static HTML —
+// the real visitor's push() then aborts ("already have ads in them") and the slot
+// earns nothing, while every build fires ad requests from a datacenter IP.
+function isPrerender() {
+  if (typeof window === "undefined") return true;
+  return Boolean(window.__PRERENDER_INJECTED) || navigator.webdriver === true;
+}
 
 function ensureAdScript() {
   if (scriptLoaded) return;
@@ -20,9 +29,16 @@ function ensureAdScript() {
 export default function AdUnit({ slot, format = "auto", style = {} }) {
   const adRef = useRef(null);
   const pushed = useRef(false);
+  // Mount ads only after hydration on a real browser, so the prerendered HTML
+  // contains a plain placeholder and the live page owns the ad lifecycle.
+  const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
-    if (!slot) return;
+    if (!isPrerender()) setEnabled(true);
+  }, []);
+
+  useEffect(() => {
+    if (!slot || !enabled) return;
     ensureAdScript();
     const timer = setTimeout(() => {
       if (pushed.current) return;
@@ -36,9 +52,14 @@ export default function AdUnit({ slot, format = "auto", style = {} }) {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [slot]);
+  }, [slot, enabled]);
 
   if (!slot) return null;
+
+  // Reserve the space during prerender/SSR without emitting an <ins> for AdSense to claim.
+  if (!enabled) {
+    return <div style={{ textAlign: "center", margin: "32px 0", minHeight: 100, ...style }} />;
+  }
 
   return (
     <div style={{ textAlign: "center", margin: "32px 0", minHeight: 100, ...style }}>

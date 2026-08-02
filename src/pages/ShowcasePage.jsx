@@ -27,9 +27,10 @@ export default function ShowcasePage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
-  const [formData, setFormData] = useState({ title: "", description: "", workflow_json: "", tags: [] });
+  const [formData, setFormData] = useState({ title: "", description: "", workflow_json: "", tags: [], category: "t2i" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
 
   // Auth state
   useEffect(() => {
@@ -45,12 +46,15 @@ export default function ShowcasePage() {
   // Fetch posts
   const fetchPosts = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     const { data, error: err } = await supabase
       .from("showcase_posts")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(50);
-    if (!err) setPosts(data || []);
+    // Ignoring the error made an outage look like an empty board.
+    if (err) { setLoadError("게시물을 불러오지 못했습니다."); setPosts([]); }
+    else setPosts(data || []);
     setLoading(false);
   }, []);
 
@@ -82,18 +86,21 @@ export default function ShowcasePage() {
 
     setSubmitting(true);
     setError("");
+    // username/avatar_url are stamped by a DB trigger from the OAuth identity —
+    // sending them here would be ignored, and trusting them would allow impersonation.
     const { error: insertErr } = await supabase.from("showcase_posts").insert({
       user_id: user.id,
-      username: user.user_metadata?.user_name || user.user_metadata?.preferred_username || "anonymous",
-      avatar_url: user.user_metadata?.avatar_url || null,
       title: formData.title.trim(),
       description: formData.description.trim() || null,
       workflow_json: formData.workflow_json.trim(),
       tags: formData.tags,
+      // Omitting this defaulted every post from this page to "t2i", so the in-app
+      // category filter never matched anything submitted here.
+      category: formData.category || "t2i",
     });
     setSubmitting(false);
-    if (insertErr) { setError(insertErr.message); return; }
-    setFormData({ title: "", description: "", workflow_json: "", tags: [] });
+    if (insertErr) { setError("게시에 실패했습니다. 잠시 후 다시 시도해주세요."); console.error("showcase insert failed:", insertErr); return; }
+    setFormData({ title: "", description: "", workflow_json: "", tags: [], category: "t2i" });
     setShowForm(false);
     fetchPosts();
   };
@@ -106,9 +113,12 @@ export default function ShowcasePage() {
     fetchPosts();
   };
 
-  // Copy JSON
+  // Copy JSON. A silent failure here means the user pastes nothing and never
+  // learns why, so surface it.
   const copyJSON = (json) => {
-    navigator.clipboard.writeText(json).catch(() => {});
+    const fail = () => window.prompt("복사에 실패했습니다. 아래 내용을 직접 복사하세요:", json);
+    if (!navigator.clipboard) { fail(); return; }
+    navigator.clipboard.writeText(json).catch(fail);
   };
 
   const toggleTag = (tag) => {
@@ -240,6 +250,11 @@ export default function ShowcasePage() {
         {/* Posts Grid */}
         {loading ? (
           <div style={{ textAlign: "center", padding: 60, color: T.text2 }}>Loading...</div>
+        ) : loadError ? (
+          <div style={{ textAlign: "center", padding: 60, color: T.text2 }}>
+            <p style={{ fontSize: 16, marginBottom: 12 }}>{loadError}</p>
+            <button onClick={fetchPosts} style={{ padding: "8px 20px", borderRadius: 8, border: `1px solid ${T.border}`, background: "transparent", color: T.text2, fontSize: 14, cursor: "pointer" }}>다시 시도</button>
+          </div>
         ) : posts.length === 0 ? (
           <div style={{ textAlign: "center", padding: 60, color: T.text2 }}>
             <p style={{ fontSize: 18, marginBottom: 8 }}>No workflows shared yet.</p>
