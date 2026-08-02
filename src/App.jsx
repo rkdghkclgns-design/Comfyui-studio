@@ -25,22 +25,87 @@ function showExport(content, filename) {
 // ═══════════════════════════════════════════
 // WORKFLOW URL SHARING (Feature 5)
 // ═══════════════════════════════════════════
-async function shareWorkflow(wf) {
-  const id = "s_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+// The workflow travels inside the URL itself. A previous version stored it in
+// localStorage and handed out an id, which meant the link never resolved on the
+// recipient's machine — the share silently did nothing.
+const SHARE_URL_MAX = 30000; // keep well under browser/proxy URL limits
+
+function encodeWorkflow(wf) {
+  const bytes = new TextEncoder().encode(JSON.stringify(wf));
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 1) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function decodeWorkflow(encoded) {
+  const b64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
+  const bin = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+// Returns a shareable URL, or null when the workflow is too large to fit in one.
+function buildShareUrl(wf) {
   try {
-    await window.storage.set("shared:wf:" + id, JSON.stringify(wf), true);
-    return id;
+    const url = window.location.origin + window.location.pathname + "#wf=" + encodeWorkflow(wf);
+    return url.length <= SHARE_URL_MAX ? url : null;
   } catch { return null; }
 }
-async function loadSharedWorkflow(id) {
+
+function loadSharedWorkflow() {
   try {
-    const r = await window.storage.get("shared:wf:" + id, true);
-    return r ? JSON.parse(r.value) : null;
+    const hash = window.location.hash || "";
+    const m = hash.match(/[#&]wf=([^&]+)/);
+    return m ? decodeWorkflow(m[1]) : null;
   } catch { return null; }
 }
 
 // Generate a random valid seed
 function randomSeed() { return Math.floor(Math.random() * 2147483647); }
+
+// ═══════════════════════════════════════════
+// WORKFLOW PATCH APPLICATION
+// The improver asks the model for a *patch* rather than the whole workflow.
+// Returning a full workflow meant the output had to restate every node, which
+// blew the token ceiling on any real-sized graph and produced truncated JSON.
+// ═══════════════════════════════════════════
+function applyWorkflowPatch(original, patch) {
+  const wf = JSON.parse(JSON.stringify(original));
+  wf.nodes = Array.isArray(wf.nodes) ? wf.nodes : [];
+  wf.links = Array.isArray(wf.links) ? wf.links : [];
+
+  const removed = new Set((patch.remove || []).map(Number).filter(Number.isFinite));
+  if (removed.size) {
+    wf.nodes = wf.nodes.filter(n => !removed.has(Number(n.id)));
+    wf.links = wf.links.filter(l => !removed.has(Number(l[1])) && !removed.has(Number(l[3])));
+  }
+
+  for (const mod of patch.modify || []) {
+    const target = wf.nodes.find(n => Number(n.id) === Number(mod.id));
+    if (!target) continue;
+    if (Array.isArray(mod.widgets_values)) target.widgets_values = mod.widgets_values;
+    if (typeof mod.title === "string") target.title = mod.title;
+    if (typeof mod.type === "string") target.type = mod.type;
+  }
+
+  for (const node of patch.add || []) {
+    if (node && node.id != null && node.type) wf.nodes.push(node);
+  }
+
+  const removeLinkIds = new Set((patch.links_remove || []).map(Number).filter(Number.isFinite));
+  if (removeLinkIds.size) wf.links = wf.links.filter(l => !removeLinkIds.has(Number(l[0])));
+
+  for (const link of patch.links_add || []) {
+    if (Array.isArray(link) && link.length >= 5) wf.links.push(link);
+  }
+
+  const maxNodeId = wf.nodes.reduce((m, n) => Math.max(m, Number(n.id) || 0), 0);
+  const maxLinkId = wf.links.reduce((m, l) => Math.max(m, Number(l[0]) || 0), 0);
+  wf.last_node_id = maxNodeId;
+  wf.last_link_id = maxLinkId;
+  return wf;
+}
 
 // ═══════════════════════════════════════════
 // THEME SYSTEM (#12)
@@ -176,6 +241,15 @@ const LANG = {
     aiPlaceholder: "예: 실사풍 제품 배경 교체, 4K 업스케일",
     aiExamples: "실사 인물 사진,제품 배경 교체,이미지→비디오,애니메이션",
     aiAnalyzing: "분석 중...", aiGenerate: "생성 →", aiFail: "AI 분석 실패",
+    aiInterviewing: "질문 준비 중...", aiInterviewTitle: "몇 가지만 확인할게요",
+    aiInterviewDesc: "목적에 맞는 워크플로우를 만들기 위한 질문입니다. 답을 고르거나 직접 입력하세요.",
+    aiInterviewSkip: "건너뛰고 바로 생성", aiInterviewSubmit: "답변 반영해 생성 →",
+    aiInterviewBack: "← 목적 다시 입력", aiCustomPlaceholder: "직접 입력 (선택)",
+    aiInterviewFallback: "질문을 준비하지 못해 바로 생성합니다.",
+    aiInterviewNeedAnswer: "최소 한 개 이상 답변해주세요.",
+    aiTooLong: "내용이 너무 길어 응답이 잘렸습니다. 워크플로우를 줄이거나 나눠서 시도해주세요.",
+    shareTooBig: "워크플로우가 너무 커서 링크로 공유할 수 없습니다. JSON 파일을 직접 전달해주세요.",
+    shareLinkBad: "공유 링크가 손상되었습니다.",
     aiJsonFail: "유효한 JSON 파일이 아닙니다", aiJsonInvalid: "유효한 JSON이 아닙니다",
     // Improver (sub)
     impDesc: "기존 워크플로우를 첨부하고 개선 요청을 입력하세요",
@@ -321,6 +395,15 @@ const LANG = {
     aiPlaceholder: "e.g. Realistic product background swap, 4K upscale",
     aiExamples: "Realistic portrait,Background swap,Image→Video,Animation",
     aiAnalyzing: "Analyzing...", aiGenerate: "Generate →", aiFail: "AI analysis failed",
+    aiInterviewing: "Preparing questions...", aiInterviewTitle: "A few quick questions",
+    aiInterviewDesc: "Answer these so the workflow matches your goal. Pick an option or type your own.",
+    aiInterviewSkip: "Skip & generate now", aiInterviewSubmit: "Generate with answers →",
+    aiInterviewBack: "← Edit goal", aiCustomPlaceholder: "Type your own (optional)",
+    aiInterviewFallback: "Couldn't prepare questions — generating directly.",
+    aiInterviewNeedAnswer: "Please answer at least one question.",
+    aiTooLong: "The response was cut off because the input is too long. Try a smaller workflow or split it up.",
+    shareTooBig: "This workflow is too large to share as a link. Send the JSON file instead.",
+    shareLinkBad: "This share link is corrupted.",
     aiJsonFail: "Not a valid JSON file", aiJsonInvalid: "Invalid JSON",
     impDesc: "Upload your workflow and describe improvements",
     impStep1: "① Workflow JSON", impStep2: "② Improvement Request",
@@ -457,6 +540,15 @@ const LANG = {
     aiPlaceholder: "例：实景产品背景替换，4K超分",
     aiExamples: "实景人像,产品背景替换,图→视频,动画",
     aiAnalyzing: "分析中...", aiGenerate: "生成 →", aiFail: "AI分析失败",
+    aiInterviewing: "正在准备问题...", aiInterviewTitle: "先确认几个问题",
+    aiInterviewDesc: "为了生成符合目的的工作流，请选择或自行输入答案。",
+    aiInterviewSkip: "跳过并直接生成", aiInterviewSubmit: "根据回答生成 →",
+    aiInterviewBack: "← 重新输入目的", aiCustomPlaceholder: "自行输入（可选）",
+    aiInterviewFallback: "无法准备问题，将直接生成。",
+    aiInterviewNeedAnswer: "请至少回答一个问题。",
+    aiTooLong: "内容过长导致响应被截断。请缩小工作流或分批尝试。",
+    shareTooBig: "工作流过大，无法通过链接分享。请直接发送 JSON 文件。",
+    shareLinkBad: "分享链接已损坏。",
     aiJsonFail: "不是有效的JSON文件", aiJsonInvalid: "无效的JSON",
     impDesc: "上传工作流并描述改进需求",
     impStep1: "① 工作流JSON", impStep2: "② 改进请求",
@@ -593,6 +685,15 @@ const LANG = {
     aiPlaceholder: "例：リアル製品背景差替え、4Kアップスケール",
     aiExamples: "リアル人物,背景差替え,画像→動画,アニメ",
     aiAnalyzing: "分析中...", aiGenerate: "生成 →", aiFail: "AI分析失敗",
+    aiInterviewing: "質問を準備中...", aiInterviewTitle: "いくつか確認させてください",
+    aiInterviewDesc: "目的に合ったワークフローのための質問です。選択するか直接入力してください。",
+    aiInterviewSkip: "スキップしてすぐ生成", aiInterviewSubmit: "回答を反映して生成 →",
+    aiInterviewBack: "← 目的を再入力", aiCustomPlaceholder: "直接入力（任意）",
+    aiInterviewFallback: "質問を準備できなかったため、そのまま生成します。",
+    aiInterviewNeedAnswer: "少なくとも1つ回答してください。",
+    aiTooLong: "内容が長すぎて応答が途切れました。ワークフローを小さくするか分割してください。",
+    shareTooBig: "ワークフローが大きすぎてリンク共有できません。JSONファイルを直接お渡しください。",
+    shareLinkBad: "共有リンクが破損しています。",
     aiJsonFail: "有効なJSONファイルではありません", aiJsonInvalid: "無効なJSON",
     impDesc: "ワークフローをアップロードして改善内容を入力",
     impStep1: "① ワークフローJSON", impStep2: "② 改善リクエスト",
@@ -642,16 +743,63 @@ const FONT = "'DM Sans',-apple-system,'Pretendard',sans-serif";
 const SERIF = "'Source Serif 4','Georgia',serif";
 const MONO = "'JetBrains Mono','Fira Code',monospace";
 
-const GEMINI_PROXY_URL = "https://pkwbqbxuujpcvndpacsc.supabase.co/functions/v1/gemini-proxy";
-async function callGemini(prompt, systemInstruction) {
-  const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7, maxOutputTokens: 4096 } };
+const GEMINI_PROXY_URL = "https://etasxbaorwgjoofdxean.supabase.co/functions/v1/gemini-proxy";
+
+// Thrown when the model hit its output ceiling. Callers surface a size-specific
+// message instead of a generic failure, since retrying verbatim will not help.
+class GeminiTruncatedError extends Error {
+  constructor() { super("MAX_TOKENS"); this.name = "GeminiTruncatedError"; }
+}
+
+// `task` selects the server-side model + token ceiling (see supabase/functions/gemini-proxy).
+// The client cannot pick a model; passing an unknown task falls back to "generate".
+async function callGemini(prompt, systemInstruction, task = "generate") {
+  const body = { task, contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7 } };
   if (systemInstruction) body.systemInstruction = { parts: [{ text: systemInstruction }] };
   const r = await fetch(GEMINI_PROXY_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!r.ok) { const err = await r.json().catch(() => ({})); throw new Error(err.error?.message || `Gemini API error: ${r.status}`); }
+  if (!r.ok) { const err = await r.json().catch(() => ({})); throw new Error(err.error?.message || err.error || `Gemini API error: ${r.status}`); }
   const d = await r.json();
-  const parts = d.candidates?.[0]?.content?.parts || [];
+  const cand = d.candidates?.[0];
+  const parts = cand?.content?.parts || [];
   const textPart = parts.find(p => p.text !== undefined);
-  return textPart?.text || "";
+  const text = textPart?.text || "";
+  if (!text && cand?.finishReason === "MAX_TOKENS") throw new GeminiTruncatedError();
+  if (!text) throw new Error(`Empty response (finishReason: ${cand?.finishReason || "unknown"})`);
+  return text;
+}
+
+// Strip markdown fences the model sometimes adds despite instructions.
+function parseAIJson(raw) {
+  return JSON.parse(String(raw).replace(/```json|```/g, "").trim());
+}
+
+// The model's output is untrusted: an out-of-range or misspelled value silently
+// produces a workflow ComfyUI rejects, which users blame on this tool. Clamp it.
+const clampInt = (v, lo, hi, fallback) => {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fallback;
+};
+const clampNum = (v, lo, hi, fallback) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fallback;
+};
+const pickFrom = (v, allowed, fallback) => (allowed.includes(v) ? v : fallback);
+
+function sanitizeAIConfig(parsed, base) {
+  const categories = CATS.map(c => c.id);
+  const dim = v => clampInt(Math.round(clampInt(v, 256, 2048, 1024) / 8) * 8, 256, 2048, 1024);
+  return {
+    category: pickFrom(parsed.category, categories, base.category || "t2i"),
+    sampler: pickFrom(parsed.sampler, SAMPLERS, base.sampler),
+    scheduler: pickFrom(parsed.scheduler, SCHEDULERS, base.scheduler),
+    modelBase: pickFrom(parsed.modelBase, ["SD15", "SDXL", "Flux", "Wan", "Hunyuan"], base.modelBase),
+    steps: clampInt(parsed.steps, 1, 60, base.steps),
+    cfg: clampNum(parsed.cfg, 1, 15, base.cfg),
+    width: dim(parsed.width),
+    height: dim(parsed.height),
+    prompt: typeof parsed.prompt === "string" ? parsed.prompt.slice(0, 2000) : base.prompt,
+    negPrompt: typeof parsed.negPrompt === "string" ? parsed.negPrompt.slice(0, 2000) : base.negPrompt,
+  };
 }
 
 const LANG_LABELS = { ko: "한국어", en: "English", zh: "中文", ja: "日本語" };
@@ -1836,7 +1984,7 @@ function PromptBuilder({ theme, onApply, lang }) {
     if (!current) return;
     setOptimizing(true);
     try {
-      const improved = (await callGemini(`ComfyUI prompt optimizer. Improve this prompt for SDXL model. Keep the same intent but make it more detailed and effective. Return ONLY the improved prompt text, nothing else.\nOriginal: ${current}`)).trim();
+      const improved = (await callGemini(`ComfyUI prompt optimizer. Improve this prompt for SDXL model. Keep the same intent but make it more detailed and effective. Return ONLY the improved prompt text, nothing else.\nOriginal: ${current}`, null, "prompt")).trim();
       if (improved) setCustomPrompt(improved);
     } catch {}
     setOptimizing(false);
@@ -1932,10 +2080,12 @@ function WorkflowDebugger({ theme, lang }) {
     setLoading(true);
     try {
       const sysLang = lang === "ko" ? "한국어" : lang === "zh" ? "中文" : lang === "ja" ? "日本語" : "English";
-      const raw = await callGemini(`에러: ${errorMsg}\n\n워크플로우: ${debugWf.slice(0, 5000)}`, "ComfyUI troubleshooting expert. Analyze user error messages and workflow. Respond in " + sysLang + ". JSON response: {\"diagnosis\": \"cause\", \"fixes\": [\"fix 1\", \"fix 2\"], \"prevention\": \"tip\"}");
-      const text = raw.replace(/```json|```/g, "").trim();
-      setResult(JSON.parse(text));
-    } catch { setResult({ diagnosis: t("dbAIFail"), fixes: [t("dbMoreDetail")], prevention: "" }); }
+      const raw = await callGemini(`에러: ${errorMsg}\n\n워크플로우: ${debugWf.slice(0, 5000)}`, "ComfyUI troubleshooting expert. Analyze user error messages and workflow. Respond in " + sysLang + ". JSON response: {\"diagnosis\": \"cause\", \"fixes\": [\"fix 1\", \"fix 2\"], \"prevention\": \"tip\"}", "diagnose");
+      setResult(parseAIJson(raw));
+    } catch (err) {
+      const msg = err instanceof GeminiTruncatedError ? t("aiTooLong") : t("dbAIFail");
+      setResult({ diagnosis: msg, fixes: [t("dbMoreDetail")], prevention: "" });
+    }
     setLoading(false);
   };
 
@@ -2431,6 +2581,7 @@ function ShowcaseSection({ theme, lang }) {
   const [filterCat, setFilterCat] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [loadError, setLoadError] = useState("");
   const POSTS_PER_PAGE = 12;
 
   const TAG_OPTIONS = ["txt2img", "img2img", "controlnet", "upscale", "inpaint", "anime", "realistic", "SDXL", "Flux", "SD1.5", "LoRA", "video"];
@@ -2452,13 +2603,35 @@ function ShowcaseSection({ theme, lang }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  // The list view never shows workflow_json, but selecting it shipped ~30KB per row
+  // on every load. Fetch it lazily when a post is actually opened.
+  const LIST_COLUMNS = "id,user_id,username,avatar_url,title,description,tags,category,created_at";
+
   const fetchPosts = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from("showcase_posts").select("*").order("created_at", { ascending: false }).limit(200);
-    setPosts(data || []);
+    setLoadError("");
+    const { data, error: err } = await supabase
+      .from("showcase_posts")
+      .select(LIST_COLUMNS)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    // Previously the error was discarded, so an outage rendered as "no posts yet".
+    if (err) { setLoadError(isKo ? "게시물을 불러오지 못했습니다." : "Could not load posts."); setPosts([]); }
+    else setPosts(data || []);
     setLoading(false);
-  }, []);
+  }, [isKo]);
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
+
+  const openPost = useCallback(async (post) => {
+    setSelectedPost(post);
+    if (post.workflow_json !== undefined) return;
+    const { data, error: err } = await supabase
+      .from("showcase_posts")
+      .select("workflow_json")
+      .eq("id", post.id)
+      .single();
+    if (!err && data) setSelectedPost(prev => (prev && prev.id === post.id ? { ...prev, workflow_json: data.workflow_json } : prev));
+  }, []);
 
   // Client-side filter + search + pagination
   const filteredPosts = posts.filter(p => {
@@ -2845,7 +3018,8 @@ function ShowcaseSection({ theme, lang }) {
       title: formData.title.trim(), description: formData.description.trim() || null, workflow_json: formData.workflow_json.trim(), tags: formData.tags, category: formData.category || "t2i",
     });
     setSubmitting(false);
-    if (err) { setError(err.message); return; }
+    // Raw PostgREST text leaks schema details and means nothing to a user.
+    if (err) { setError(isKo ? "게시에 실패했습니다. 잠시 후 다시 시도해주세요." : "Could not post. Please try again."); console.error("showcase insert failed:", err); return; }
     setFormData({ title: "", description: "", workflow_json: "", tags: [], category: "t2i" }); setShowForm(false); fetchPosts();
   };
 
@@ -2855,7 +3029,12 @@ function ShowcaseSection({ theme, lang }) {
     setSelectedPost(null); fetchPosts();
   };
 
-  const copyJSON = (json) => { navigator.clipboard.writeText(json).catch(() => {}); };
+  // Copying the JSON is the whole point of the showcase — swallowing a failure here
+  // left users pasting nothing. Fall back to the export modal so they can copy manually.
+  const copyJSON = (json) => {
+    navigator.clipboard?.writeText(json).catch(() => showExport(json, "workflow.json"))
+      ?? showExport(json, "workflow.json");
+  };
   const downloadJSON = (json, title) => {
     try {
       const pretty = JSON.stringify(JSON.parse(json), null, 2);
@@ -2979,16 +3158,21 @@ function ShowcaseSection({ theme, lang }) {
             </div>
             {selectedPost.description && <p style={{ fontSize: 14, color: T.text2, marginBottom: 16, lineHeight: 1.7 }}>{selectedPost.description}</p>}
             {selectedPost.tags?.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>{selectedPost.tags.map(t => <span key={t} style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, background: `${T.accent}15`, color: T.accent, border: `1px solid ${T.accent}30` }}>{t}</span>)}</div>}
-            {/* Workflow Rich Preview */}
-            {(() => { const info = parseWorkflow(selectedPost.workflow_json); return info ? <div style={{ marginBottom: 16 }}><WorkflowRichPreview info={info} /></div> : null; })()}
-            {/* Collapsible JSON */}
-            <details style={{ marginTop: 8 }}>
-              <summary style={{ cursor: "pointer", fontSize: 13, color: T.text2, fontWeight: 600, padding: "8px 0", display: "flex", alignItems: "center", gap: 8, userSelect: "none" }}>
-                <span>Workflow JSON</span>
-                <button onClick={(e) => { e.preventDefault(); downloadJSON(selectedPost.workflow_json, selectedPost.title); }} style={{ padding: "4px 12px", borderRadius: 6, border: `1px solid ${T.accent}`, background: `${T.accent}15`, color: T.accent, fontSize: 11, fontWeight: 600, cursor: "pointer", marginLeft: "auto" }}>{isKo ? "⬇ JSON 다운로드" : "⬇ Download JSON"}</button>
-              </summary>
-              <pre style={{ background: T.bg, padding: 16, borderRadius: 12, border: `1px solid ${T.border}`, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: T.text2, overflow: "auto", maxHeight: 400, whiteSpace: "pre-wrap", wordBreak: "break-all", marginTop: 8 }}>{(() => { try { return JSON.stringify(JSON.parse(selectedPost.workflow_json), null, 2); } catch { return selectedPost.workflow_json; } })()}</pre>
-            </details>
+            {/* workflow_json is fetched on open, so it may not be here for a moment */}
+            {selectedPost.workflow_json === undefined ? (
+              <div style={{ fontSize: 12, color: T.text4, padding: "16px 0" }}>{isKo ? "워크플로우 불러오는 중..." : "Loading workflow..."}</div>
+            ) : (<>
+              {/* Workflow Rich Preview */}
+              {(() => { const info = parseWorkflow(selectedPost.workflow_json); return info ? <div style={{ marginBottom: 16 }}><WorkflowRichPreview info={info} /></div> : null; })()}
+              {/* Collapsible JSON */}
+              <details style={{ marginTop: 8 }}>
+                <summary style={{ cursor: "pointer", fontSize: 13, color: T.text2, fontWeight: 600, padding: "8px 0", display: "flex", alignItems: "center", gap: 8, userSelect: "none" }}>
+                  <span>Workflow JSON</span>
+                  <button onClick={(e) => { e.preventDefault(); downloadJSON(selectedPost.workflow_json, selectedPost.title); }} style={{ padding: "4px 12px", borderRadius: 6, border: `1px solid ${T.accent}`, background: `${T.accent}15`, color: T.accent, fontSize: 11, fontWeight: 600, cursor: "pointer", marginLeft: "auto" }}>{isKo ? "⬇ JSON 다운로드" : "⬇ Download JSON"}</button>
+                </summary>
+                <pre style={{ background: T.bg, padding: 16, borderRadius: 12, border: `1px solid ${T.border}`, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: T.text2, overflow: "auto", maxHeight: 400, whiteSpace: "pre-wrap", wordBreak: "break-all", marginTop: 8 }}>{(() => { try { return JSON.stringify(JSON.parse(selectedPost.workflow_json), null, 2); } catch { return selectedPost.workflow_json; } })()}</pre>
+              </details>
+            </>)}
             {user && user.id === selectedPost.user_id && <button onClick={() => handleDelete(selectedPost.id)} style={{ marginTop: 16, padding: "8px 18px", borderRadius: 10, border: `1px solid #e55`, background: "transparent", color: "#e55", fontSize: 12, cursor: "pointer" }}>{isKo ? "삭제" : "Delete"}</button>}
           </div>
         </div>
@@ -3016,6 +3200,11 @@ function ShowcaseSection({ theme, lang }) {
       {/* Posts Grid */}
       {loading ? (
         <div style={{ textAlign: "center", padding: 40, color: T.text3, fontSize: 12 }}>Loading...</div>
+      ) : loadError ? (
+        <div style={{ textAlign: "center", padding: 40, color: T.text3 }}>
+          <p style={{ fontSize: 14, marginBottom: 10 }}>{loadError}</p>
+          <button onClick={fetchPosts} style={{ padding: "6px 16px", borderRadius: 8, border: `1px solid ${T.border2}`, background: "transparent", color: T.text2, fontSize: 12, cursor: "pointer" }}>{isKo ? "다시 시도" : "Retry"}</button>
+        </div>
       ) : filteredPosts.length === 0 ? (
         <div style={{ textAlign: "center", padding: 40, color: T.text3 }}>
           <p style={{ fontSize: 14, marginBottom: 4 }}>{searchQuery ? (isKo ? "검색 결과가 없습니다." : "No results found.") : (isKo ? "아직 공유된 워크플로우가 없습니다." : "No workflows shared yet.")}</p>
@@ -3029,7 +3218,7 @@ function ShowcaseSection({ theme, lang }) {
               const catInfo = CATEGORIES.find(c => c.id === post.category);
               const lbl = post.likes_count >= 80 ? { text: "BEST", bg: "#f472b6", color: "#fff" } : post.likes_count >= 50 ? { text: isKo ? "인기" : "HOT", bg: "#fbbf24", color: "#1a1a1a" } : null;
               return (
-              <div key={post.id} onClick={() => setSelectedPost(post)} style={{ background: T.bg2, border: `1px solid ${lbl ? lbl.bg + "40" : T.border}`, borderRadius: 12, padding: 16, cursor: "pointer", transition: "border-color .2s", position: "relative" }}>
+              <div key={post.id} onClick={() => openPost(post)} style={{ background: T.bg2, border: `1px solid ${lbl ? lbl.bg + "40" : T.border}`, borderRadius: 12, padding: 16, cursor: "pointer", transition: "border-color .2s", position: "relative" }}>
                 {lbl && <span style={{ position: "absolute", top: -6, right: 12, padding: "2px 8px", borderRadius: 6, fontSize: 9, fontWeight: 800, background: lbl.bg, color: lbl.color, letterSpacing: "0.5px" }}>{lbl.text}</span>}
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                   {post.avatar_url && <img src={post.avatar_url} alt="" style={{ width: 18, height: 18, borderRadius: "50%" }} />}
@@ -3284,6 +3473,10 @@ export default function App() {
   const [generating, setGenerating] = useState(false);
   const [aiMode, setAiMode] = useState("manual"); // "manual" | "ai" | "improve"
   const [aiInput, setAiInput] = useState("");
+  const [aiInterview, setAiInterview] = useState(null); // null | { questions: [{ q, options, allowCustom }] }
+  const [aiAnswers, setAiAnswers] = useState({}); // { [questionIdx]: { choice, custom } }
+  const [interviewLoading, setInterviewLoading] = useState(false);
+  const [aiNotice, setAiNotice] = useState(""); // inline notice shown above the AI form
   // Export modal replaces clipboard/download
   const [exportModal, setExportModal] = useState(null);
   useEffect(() => { _showExportFn = setExportModal; return () => { _showExportFn = null; }; }, []);
@@ -3333,12 +3526,17 @@ export default function App() {
       if (savedHistory) setWfHistory(savedHistory);
       if (savedProgress) setTutProgress(savedProgress);
       if (!sawOnboarding) setShowOnboarding(true);
-      // Feature 5: Load shared workflow from URL
-      const params = new URLSearchParams(window.location.search);
-      const sharedId = params.get("wf");
-      if (sharedId) {
-        const sharedWf = await loadSharedWorkflow(sharedId);
-        if (sharedWf) { setWorkflow(sharedWf); setValidation(validateWF(sharedWf, "ko")); setCat("t2i"); setStep(2); }
+      // Feature 5: Load shared workflow carried in the URL hash
+      if (/[#&]wf=/.test(window.location.hash || "")) {
+        const sharedWf = loadSharedWorkflow();
+        if (sharedWf) {
+          setWorkflow(sharedWf);
+          setValidation(validateWF(sharedWf, savedLang && LANG[savedLang] ? savedLang : "ko"));
+          setCat("t2i");
+          setStep(2);
+        } else {
+          alert(LANG[savedLang && LANG[savedLang] ? savedLang : "ko"].shareLinkBad);
+        }
       }
     })();
   }, []);
@@ -3356,6 +3554,17 @@ export default function App() {
     return () => window.removeEventListener("keydown", handler);
   }, [step, cat, activeTut]);
 
+  // History was previously only held in memory and never written back to storage,
+  // so it vanished on reload. Persist on every record.
+  const recordHistory = (wf, category, cfg) => {
+    const entry = { id: Date.now(), cat: category, nodeCount: wf.nodes.length, date: new Date().toLocaleDateString(), model: cfg.model, sampler: cfg.sampler };
+    setWfHistory(prev => {
+      const next = [entry, ...prev].slice(0, 20);
+      store.set("wf:history", next).catch(() => {});
+      return next;
+    });
+  };
+
   const doGenerate = () => {
     if (!config.model || config.model === "YOUR_MODEL.safetensors" || !config.model.trim()) {
       alert(t("modelAlert"));
@@ -3368,29 +3577,90 @@ export default function App() {
     const issues = validateWF(wf, lang);
     setValidation(issues);
     setWorkflow(wf);
+    recordHistory(wf, cat, finalConfig);
     setStep(2);
   };
   doGenerateRef.current = doGenerate;
 
-  // Fixed AI generate (#2)
-  const doAIGenerate = async () => {
+  // Fixed AI generate (#2) — optionally enriched with interview Q&A context
+  const doAIGenerate = async (qaPairs) => {
     if (!aiInput.trim()) return;
     setGenerating(true);
     try {
-      const aiRaw = await callGemini(`ComfyUI expert. User:"${aiInput}"\nJSON only:\n{"category":"t2i|i2i|inpaint|upscale|t2v|i2v|controlnet|lora|batch","sampler":"...","scheduler":"...","steps":25,"cfg":7,"width":1024,"height":1024,"prompt":"optimized","negPrompt":"optimized","modelBase":"SD15|SDXL|Flux|Wan|Hunyuan"}`);
-      const parsed = JSON.parse(aiRaw.replace(/```json|```/g, "").trim());
-      // Fix #2: Use parsed directly, not stale config
-      const newConfig = { ...config, ...parsed };
-      setCat(parsed.category);
+      const qaBlock = Array.isArray(qaPairs) && qaPairs.length
+        ? `\nClarified via interview:\n${qaPairs.map(p => `- ${p.q} → ${p.a}`).join("\n")}`
+        : "";
+      const aiRaw = await callGemini(`ComfyUI expert. User goal:"${aiInput}"${qaBlock}\nWrite "prompt" and "negPrompt" in English (Stable Diffusion prompt syntax) regardless of the user's language.\nJSON only:\n{"category":"t2i|i2i|inpaint|upscale|t2v|i2v|controlnet|lora|batch","sampler":"...","scheduler":"...","steps":25,"cfg":7,"width":1024,"height":1024,"prompt":"optimized","negPrompt":"optimized","modelBase":"SD15|SDXL|Flux|Wan|Hunyuan"}`, null, "generate");
+      // The model's output is untrusted — clamp/whitelist before it reaches genWF.
+      const safe = sanitizeAIConfig(parseAIJson(aiRaw), config);
+      const newConfig = { ...config, ...safe };
+      setCat(safe.category);
       setConfig(newConfig);
-      const wf = genWF({ ...newConfig, category: parsed.category });
+      const wf = genWF({ ...newConfig, category: safe.category });
       setValidation(validateWF(wf, lang));
       setWorkflow(wf);
-      const entry = { id: Date.now(), cat: parsed.category, nodeCount: wf.nodes.length, date: new Date().toLocaleDateString(), model: newConfig.model, sampler: newConfig.sampler };
-      setWfHistory(prev => [entry, ...prev].slice(0, 20));
+      recordHistory(wf, safe.category, newConfig);
       setGenerating(false);
+      setAiInterview(null);
+      setAiAnswers({});
       setStep(2);
-    } catch { setGenerating(false); alert(t("aiFail")); }
+    } catch (err) {
+      setGenerating(false);
+      alert(err instanceof GeminiTruncatedError ? t("aiTooLong") : t("aiFail"));
+    }
+  };
+
+  // Interview step: ask clarifying questions about the user's purpose before generating.
+  // Falls back to direct generation if question generation fails.
+  const doAIInterview = async () => {
+    if (!aiInput.trim()) return;
+    setInterviewLoading(true);
+    try {
+      const raw = await callGemini(
+        `You are a ComfyUI workflow consultant. A user wants a workflow auto-generated. Before building it, interview them to clarify their purpose.\nUser goal: "${aiInput}"\nGenerate 3-4 SHORT multiple-choice questions that would most change the workflow design for THIS goal. Cover only what is genuinely ambiguous — e.g. visual style, output size/aspect ratio, quality vs speed priority, base model preference (SD15/SDXL/Flux...), whether a source/reference image exists, image vs video output. Do NOT ask about things already clear from the goal.\nWrite questions and options in ${LANG_LABELS[lang] || "English"}. Options within a question must all be distinct.\nJSON only, no markdown:\n{"questions":[{"q":"question text","options":["option1","option2","option3"],"allowCustom":true}]}`,
+        null,
+        "interview"
+      );
+      const parsed = parseAIJson(raw);
+      if (!Array.isArray(parsed.questions) || parsed.questions.length === 0) throw new Error("no questions");
+      // Models occasionally repeat an option; duplicates would collide as React keys.
+      const questions = parsed.questions
+        .filter(qu => qu && typeof qu.q === "string")
+        .slice(0, 4)
+        .map(qu => ({
+          ...qu,
+          options: Array.from(new Set((Array.isArray(qu.options) ? qu.options : []).filter(o => typeof o === "string"))).slice(0, 6),
+        }));
+      if (questions.length === 0) throw new Error("no valid questions");
+      setAiInterview({ questions });
+      setAiAnswers({});
+      setInterviewLoading(false);
+    } catch {
+      // Don't leave the user staring at a spinner that silently became a workflow —
+      // tell them the interview was skipped, then generate directly.
+      setInterviewLoading(false);
+      setAiNotice(t("aiInterviewFallback"));
+      doAIGenerate();
+    }
+  };
+
+  const interviewAnswerCount = aiInterview
+    ? aiInterview.questions.filter((_, i) => {
+        const ans = aiAnswers[i] || {};
+        return ((ans.custom || "").trim() || ans.choice || "") !== "";
+      }).length
+    : 0;
+
+  const submitInterview = () => {
+    if (!aiInterview) return;
+    const qaPairs = aiInterview.questions
+      .map((qu, i) => {
+        const ans = aiAnswers[i] || {};
+        const a = (ans.custom || "").trim() || ans.choice || "";
+        return a ? { q: qu.q, a } : null;
+      })
+      .filter(Boolean);
+    doAIGenerate(qaPairs);
   };
 
   // ═══ WORKFLOW IMPROVER ═══
@@ -3423,53 +3693,62 @@ export default function App() {
       ).join("\n");
       const linksSummary = (parsedOriginal.links || []).map(l => `${l[1]}:${l[2]} → ${l[3]}:${l[4]} (${l[5]})`).join(", ");
 
-      const systemPrompt = `You are a ComfyUI workflow expert. The user will provide their existing ComfyUI workflow and an improvement request.
+      const outLang = lang === "ko" ? "Korean" : lang === "zh" ? "Chinese" : lang === "ja" ? "Japanese" : "English";
+      const maxNodeId = (parsedOriginal.nodes || []).reduce((m, n) => Math.max(m, Number(n.id) || 0), 0);
+      const maxLinkId = (parsedOriginal.links || []).reduce((m, l) => Math.max(m, Number(l[0]) || 0), 0);
 
-Your job:
-1. Analyze the current workflow (nodes, connections, parameters)
-2. Understand what the user wants to improve
-3. Return a JSON response with:
-   - "analysis": Brief Korean explanation of the current workflow (2-3 sentences)
-   - "changes": Array of change descriptions in ${lang === "ko" ? "Korean" : lang === "zh" ? "Chinese" : lang === "ja" ? "Japanese" : "English"}, each item is a string like "KSampler steps를 20→30으로 증가"
-   - "improved": The complete improved ComfyUI workflow JSON (same format as input, version 0.4)
+      const systemPrompt = `You are a ComfyUI workflow expert. The user provides their existing workflow and an improvement request.
+
+Return ONLY a JSON PATCH describing what to change — never the full workflow.
+
+Response shape (JSON only, no markdown fences):
+{
+  "analysis": "2-3 sentence explanation of the current workflow in ${outLang}",
+  "changes": ["short description of each change, in ${outLang}"],
+  "patch": {
+    "modify": [{"id": 3, "widgets_values": [<the FULL new widgets_values array for that node>]}],
+    "add": [<complete new node objects, ids strictly greater than ${maxNodeId}>],
+    "remove": [<node ids to delete>],
+    "links_add": [[<link id greater than ${maxLinkId}>, <from node>, <from slot>, <to node>, <to slot>, "<TYPE>"]],
+    "links_remove": [<link ids to delete>]
+  }
+}
 
 CRITICAL RULES:
-- Keep all existing node IDs and links intact unless specifically removing/adding nodes
-- Only modify what the user requested
-- If adding nodes, use IDs higher than the current max
-- If changing parameters, update widgets_values array
-- Return ONLY valid JSON, no markdown fences
-- The "improved" field must be a valid ComfyUI workflow object`;
+- Include a key in "patch" ONLY if it has entries; omit empty arrays.
+- For "modify", widgets_values must be the complete array for that node, not a diff.
+- Never restate unchanged nodes. Only what the user asked for changes.
+- Return ONLY valid JSON.`;
 
+      const MAX_JSON_CHARS = 12000;
+      const truncated = improveJson.length > MAX_JSON_CHARS;
       const userMsg = `## Current Workflow
 Nodes:
 ${nodesSummary}
 
 Links: ${linksSummary}
 
-## Full JSON
-${improveJson.slice(0, 12000)}
+## Raw JSON${truncated ? " (truncated — rely on the node/link summary above)" : ""}
+${improveJson.slice(0, MAX_JSON_CHARS)}
 
 ## Improvement Request
 ${improveCmd}`;
 
-      const rawImprove = await callGemini(userMsg, systemPrompt);
-      const raw = rawImprove.replace(/```json|```/g, "").trim();
-      const result = JSON.parse(raw);
+      const rawImprove = await callGemini(userMsg, systemPrompt, "improve");
+      const result = parseAIJson(rawImprove);
 
-      if (result.improved && result.analysis) {
-        setImproveResult({
-          analysis: result.analysis,
-          changes: result.changes || [],
-          improvedWf: result.improved,
-        });
-      } else {
-        throw new Error("Invalid response format");
-      }
+      if (!result.patch || !result.analysis) throw new Error("Invalid response format");
+      const improvedWf = applyWorkflowPatch(parsedOriginal, result.patch);
+      setImproveResult({
+        analysis: result.analysis,
+        changes: result.changes || [],
+        improvedWf,
+      });
       setGenerating(false);
     } catch (err) {
       setGenerating(false);
-      alert(t("impFail") + ": " + (err.message || t("impRetryMsg")));
+      if (err instanceof GeminiTruncatedError) alert(t("aiTooLong"));
+      else alert(t("impFail") + ": " + (err.message || t("impRetryMsg")));
     }
   };
 
@@ -3612,16 +3891,57 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
               </div>
             </div>
 
-            {/* ═══ MODE: AI AUTO ═══ */}
+            {/* ═══ MODE: AI AUTO (with purpose interview) ═══ */}
             {aiMode === "ai" && (
               <div style={{ maxWidth: 560, margin: "0 auto" }}>
-                <div style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 16, padding: 24 }}>
-                  <textarea className="inp" style={{ minHeight: 80, resize: "vertical", lineHeight: 1.6, marginBottom: 10 }} placeholder={t("aiPlaceholder")} value={aiInput} onChange={e => setAiInput(e.target.value)} />
-                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 14 }}>
-                    {t("aiExamples").split(",").map(ex => <button key={ex} onClick={() => setAiInput(ex)} style={{ padding: "4px 10px", borderRadius: 14, border: `1px solid ${T.border2}`, background: "transparent", color: T.text3, fontSize: 10, cursor: "pointer" }}>{ex}</button>)}
+                {!aiInterview ? (
+                  <div style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 16, padding: 24 }}>
+                    {aiNotice && <div style={{ background: T.bg3, border: `1px solid ${T.border2}`, borderRadius: 8, padding: "8px 12px", fontSize: 11, color: T.text3, marginBottom: 12 }}>{aiNotice}</div>}
+                    <textarea className="inp" style={{ minHeight: 80, resize: "vertical", lineHeight: 1.6, marginBottom: 10 }} placeholder={t("aiPlaceholder")} value={aiInput} onChange={e => { setAiInput(e.target.value); setAiNotice(""); }} />
+                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 14 }}>
+                      {t("aiExamples").split(",").map(ex => <button key={ex} onClick={() => setAiInput(ex)} style={{ padding: "4px 10px", borderRadius: 14, border: `1px solid ${T.border2}`, background: "transparent", color: T.text3, fontSize: 10, cursor: "pointer" }}>{ex}</button>)}
+                    </div>
+                    <button className="bp" onClick={doAIInterview} disabled={interviewLoading || generating || !aiInput.trim()} style={{ width: "100%", opacity: interviewLoading || generating || !aiInput.trim() ? 0.4 : 1 }}>
+                      {interviewLoading ? <span style={{ animation: "pu 1.2s infinite" }}>{t("aiInterviewing")}</span> : generating ? <span style={{ animation: "pu 1.2s infinite" }}>{t("aiAnalyzing")}</span> : t("aiGenerate")}
+                    </button>
+                    <button onClick={() => doAIGenerate()} disabled={interviewLoading || generating || !aiInput.trim()} style={{ width: "100%", marginTop: 8, padding: "6px 0", border: "none", background: "transparent", color: T.text4, fontSize: 11, cursor: "pointer", fontFamily: font, opacity: interviewLoading || generating || !aiInput.trim() ? 0.4 : 1 }}>
+                      {t("aiInterviewSkip")}
+                    </button>
                   </div>
-                  <button className="bp" onClick={doAIGenerate} disabled={generating || !aiInput.trim()} style={{ width: "100%", opacity: generating || !aiInput.trim() ? 0.4 : 1 }}>{generating ? <span style={{ animation: "pu 1.2s infinite" }}>{t("aiAnalyzing")}</span> : t("aiGenerate")}</button>
-                </div>
+                ) : (
+                  <div style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 16, padding: 24, animation: "fi .3s ease" }}>
+                    <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{t("aiInterviewTitle")}</h3>
+                    <p style={{ color: T.text4, fontSize: 11, marginBottom: 16 }}>{t("aiInterviewDesc")}</p>
+                    {aiInterview.questions.map((qu, i) => {
+                      const ans = aiAnswers[i] || {};
+                      return (
+                        <div key={i} style={{ marginBottom: 16 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: T.text, marginBottom: 8 }}>{i + 1}. {qu.q}</div>
+                          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 6 }}>
+                            {(qu.options || []).map(op => {
+                              const selected = ans.choice === op;
+                              return (
+                                <button key={op} onClick={() => setAiAnswers(prev => ({ ...prev, [i]: { ...prev[i], choice: selected ? "" : op } }))} style={{ padding: "5px 12px", borderRadius: 14, border: `1px solid ${selected ? T.text : T.border2}`, background: selected ? T.text : "transparent", color: selected ? T.bg : T.text3, fontSize: 11, cursor: "pointer", fontFamily: font, fontWeight: selected ? 600 : 400, transition: "all .15s" }}>{op}</button>
+                              );
+                            })}
+                          </div>
+                          {qu.allowCustom !== false && (
+                            <input className="inp" style={{ fontSize: 11, padding: "6px 10px" }} placeholder={t("aiCustomPlaceholder")} value={ans.custom || ""} onChange={e => setAiAnswers(prev => ({ ...prev, [i]: { ...prev[i], custom: e.target.value } }))} />
+                          )}
+                        </div>
+                      );
+                    })}
+                    {interviewAnswerCount === 0 && !generating && (
+                      <div style={{ fontSize: 10, color: T.text4, marginBottom: 6, textAlign: "center" }}>{t("aiInterviewNeedAnswer")}</div>
+                    )}
+                    <button className="bp" onClick={submitInterview} disabled={generating || interviewAnswerCount === 0} style={{ width: "100%", opacity: generating || interviewAnswerCount === 0 ? 0.4 : 1 }}>
+                      {generating ? <span style={{ animation: "pu 1.2s infinite" }}>{t("aiAnalyzing")}</span> : t("aiInterviewSubmit")}
+                    </button>
+                    <button onClick={() => { setAiInterview(null); setAiAnswers({}); }} disabled={generating} style={{ width: "100%", marginTop: 8, padding: "6px 0", border: "none", background: "transparent", color: T.text4, fontSize: 11, cursor: "pointer", fontFamily: font }}>
+                      {t("aiInterviewBack")}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -3946,7 +4266,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
               <div><h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 2, fontFamily: SERIF, letterSpacing: "-0.02em" }}>{t("resultTitle")}</h2><p style={{ color: T.text4, fontSize: 11 }}>{workflow.nodes.length} {t("nodes")} · {workflow.links.length} {t("impConn")} · {t("pbApplied")}</p></div>
               <div style={{ display: "flex", gap: 5 }}>
                 <button className="bs" onClick={() => { const json = JSON.stringify(resultTab === "api" ? toAPIFormat(workflow) : workflow, null, 2); const blob = new Blob([json], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "workflow.json"; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }}>{t("resultCopy")}</button>
-                <button className="bs" onClick={async () => { const id = await shareWorkflow(workflow); if (id) { setShareId(id); showExport(window.location.origin + window.location.pathname + "?wf=" + id, "share_url.txt"); } }}>📤 {shareId ? t("rsLinked") : t("rsShare")}</button>
+                <button className="bs" onClick={() => { const url = buildShareUrl(workflow); if (url) { setShareId(true); showExport(url, "share_url.txt"); } else { alert(t("shareTooBig")); } }}>📤 {shareId ? t("rsLinked") : t("rsShare")}</button>
                 <button className="bp" onClick={() => { const data = resultTab === "api" ? toAPIFormat(workflow) : workflow; const json = JSON.stringify(data, null, 2); const blob = new Blob([json], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `comfyui_${cat}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }}>{t("resultDownload")}</button>
               </div>
             </div>
