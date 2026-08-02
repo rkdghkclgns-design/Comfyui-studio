@@ -18,14 +18,25 @@ const ALLOWED_ORIGINS = new Set([
   "http://localhost:4173",
 ]);
 
-// Client sends a task name, never a model id. Each task pins its own model and ceiling.
-// `units` is the worst-case cost in 1024-token blocks, used for quota accounting.
-const TASKS: Record<string, { model: string; maxOutputTokens: number; units: number }> = {
-  interview: { model: "gemini-2.5-flash", maxOutputTokens: 1024, units: 1 },
-  generate: { model: "gemini-2.5-flash", maxOutputTokens: 2048, units: 2 },
-  prompt: { model: "gemini-2.5-flash", maxOutputTokens: 1024, units: 1 },
-  diagnose: { model: "gemini-2.5-flash", maxOutputTokens: 4096, units: 4 },
-  improve: { model: "gemini-2.5-flash", maxOutputTokens: 16384, units: 16 },
+// Client sends a task name, never a model id. Each task pins its own model, ceiling
+// and thinking budget. `units` is the worst-case cost in 1024-token blocks.
+//
+// thinkingBudget matters a lot here: on gemini-2.5-flash, thinking tokens are billed
+// against maxOutputTokens. The interview task originally had a 1024 ceiling and was
+// spending ~979 of it on thinking, leaving a truncated fragment that failed to parse —
+// so the interview silently never appeared. Tasks that emit fixed-shape JSON get no
+// thinking; the two that benefit from reasoning get a bounded amount.
+const TASKS: Record<string, {
+  model: string;
+  maxOutputTokens: number;
+  thinkingBudget: number;
+  units: number;
+}> = {
+  interview: { model: "gemini-2.5-flash", maxOutputTokens: 2048, thinkingBudget: 0, units: 2 },
+  generate: { model: "gemini-2.5-flash", maxOutputTokens: 2048, thinkingBudget: 0, units: 2 },
+  prompt: { model: "gemini-2.5-flash", maxOutputTokens: 1024, thinkingBudget: 0, units: 1 },
+  diagnose: { model: "gemini-2.5-flash", maxOutputTokens: 4096, thinkingBudget: 1024, units: 4 },
+  improve: { model: "gemini-2.5-flash", maxOutputTokens: 16384, thinkingBudget: 2048, units: 16 },
 };
 const DEFAULT_TASK = "generate";
 
@@ -149,7 +160,11 @@ Deno.serve(async (req: Request) => {
 
     const payload: Record<string, unknown> = {
       contents,
-      generationConfig: { temperature, maxOutputTokens: task.maxOutputTokens },
+      generationConfig: {
+        temperature,
+        maxOutputTokens: task.maxOutputTokens,
+        thinkingConfig: { thinkingBudget: task.thinkingBudget },
+      },
     };
 
     // systemInstruction is accepted as plain text only (same sanitizing as contents).
