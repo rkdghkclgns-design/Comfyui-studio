@@ -19,16 +19,52 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 // Client sends a task name, never a model id. Each task pins its own model and ceiling.
-const TASKS: Record<string, { model: string; maxOutputTokens: number }> = {
-  interview: { model: "gemini-2.5-flash", maxOutputTokens: 1024 },
-  generate: { model: "gemini-2.5-flash", maxOutputTokens: 2048 },
-  prompt: { model: "gemini-2.5-flash", maxOutputTokens: 1024 },
-  diagnose: { model: "gemini-2.5-flash", maxOutputTokens: 4096 },
-  improve: { model: "gemini-2.5-flash", maxOutputTokens: 16384 },
+// `units` is the worst-case cost in 1024-token blocks, used for quota accounting.
+const TASKS: Record<string, { model: string; maxOutputTokens: number; units: number }> = {
+  interview: { model: "gemini-2.5-flash", maxOutputTokens: 1024, units: 1 },
+  generate: { model: "gemini-2.5-flash", maxOutputTokens: 2048, units: 2 },
+  prompt: { model: "gemini-2.5-flash", maxOutputTokens: 1024, units: 1 },
+  diagnose: { model: "gemini-2.5-flash", maxOutputTokens: 4096, units: 4 },
+  improve: { model: "gemini-2.5-flash", maxOutputTokens: 16384, units: 16 },
 };
 const DEFAULT_TASK = "generate";
 
 const MAX_BODY_BYTES = 64 * 1024;
+
+// Origin headers are forgeable, so they alone cannot protect an unauthenticated
+// endpoint that spends money. A daily quota is what actually bounds the bill.
+// Limits live in gemini_consume_quota's defaults (see the migration) so they can
+// be tuned in SQL without redeploying this function.
+async function consumeQuota(clientKey: string, units: number): Promise<boolean> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  // Fail closed: if the guard is misconfigured we must not become an open faucet.
+  if (!url || !key) {
+    console.error("quota guard not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
+    return false;
+  }
+  try {
+    const r = await fetch(`${url}/rest/v1/rpc/gemini_consume_quota`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ p_client: clientKey, p_units: units }),
+    });
+    if (!r.ok) {
+      console.error("quota rpc failed", r.status, (await r.text()).slice(0, 300));
+      return false;
+    }
+    return (await r.json()) === true;
+  } catch (e) {
+    console.error("quota rpc error", e);
+    return false;
+  }
+}
+
+function clientKeyFrom(req: Request): string {
+  const fwd = req.headers.get("x-forwarded-for") || "";
+  const ip = fwd.split(",")[0].trim();
+  return ip ? `ip:${ip}` : "ip:unknown";
+}
 
 function corsFor(origin: string | null): Record<string, string> {
   const allowed = origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://comfyui-studio.com";
@@ -99,6 +135,12 @@ Deno.serve(async (req: Request) => {
     const contents = sanitizeContents(body.contents);
     if (!contents) {
       return json({ error: "Missing or invalid 'contents' field" }, 400, cors);
+    }
+
+    // Charged before the upstream call — a request that is refused here costs nothing.
+    const allowed = await consumeQuota(clientKeyFrom(req), task.units);
+    if (!allowed) {
+      return json({ error: "QUOTA_EXCEEDED" }, 429, cors);
     }
 
     // Temperature is the only generation knob the client may influence, and only within range.

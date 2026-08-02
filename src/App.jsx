@@ -250,6 +250,7 @@ const LANG = {
     aiTooLong: "내용이 너무 길어 응답이 잘렸습니다. 워크플로우를 줄이거나 나눠서 시도해주세요.",
     shareTooBig: "워크플로우가 너무 커서 링크로 공유할 수 없습니다. JSON 파일을 직접 전달해주세요.",
     shareLinkBad: "공유 링크가 손상되었습니다.",
+    aiQuota: "오늘의 AI 사용량 한도에 도달했습니다. 내일 다시 시도해주세요.",
     aiJsonFail: "유효한 JSON 파일이 아닙니다", aiJsonInvalid: "유효한 JSON이 아닙니다",
     // Improver (sub)
     impDesc: "기존 워크플로우를 첨부하고 개선 요청을 입력하세요",
@@ -404,6 +405,7 @@ const LANG = {
     aiTooLong: "The response was cut off because the input is too long. Try a smaller workflow or split it up.",
     shareTooBig: "This workflow is too large to share as a link. Send the JSON file instead.",
     shareLinkBad: "This share link is corrupted.",
+    aiQuota: "Today's AI usage limit has been reached. Please try again tomorrow.",
     aiJsonFail: "Not a valid JSON file", aiJsonInvalid: "Invalid JSON",
     impDesc: "Upload your workflow and describe improvements",
     impStep1: "① Workflow JSON", impStep2: "② Improvement Request",
@@ -549,6 +551,7 @@ const LANG = {
     aiTooLong: "内容过长导致响应被截断。请缩小工作流或分批尝试。",
     shareTooBig: "工作流过大，无法通过链接分享。请直接发送 JSON 文件。",
     shareLinkBad: "分享链接已损坏。",
+    aiQuota: "已达到今日 AI 使用上限，请明天再试。",
     aiJsonFail: "不是有效的JSON文件", aiJsonInvalid: "无效的JSON",
     impDesc: "上传工作流并描述改进需求",
     impStep1: "① 工作流JSON", impStep2: "② 改进请求",
@@ -694,6 +697,7 @@ const LANG = {
     aiTooLong: "内容が長すぎて応答が途切れました。ワークフローを小さくするか分割してください。",
     shareTooBig: "ワークフローが大きすぎてリンク共有できません。JSONファイルを直接お渡しください。",
     shareLinkBad: "共有リンクが破損しています。",
+    aiQuota: "本日のAI利用上限に達しました。明日またお試しください。",
     aiJsonFail: "有効なJSONファイルではありません", aiJsonInvalid: "無効なJSON",
     impDesc: "ワークフローをアップロードして改善内容を入力",
     impStep1: "① ワークフローJSON", impStep2: "② 改善リクエスト",
@@ -751,12 +755,19 @@ class GeminiTruncatedError extends Error {
   constructor() { super("MAX_TOKENS"); this.name = "GeminiTruncatedError"; }
 }
 
+// The proxy enforces a daily spend cap. Hitting it is not a bug, so it gets its
+// own message rather than a generic "AI failed".
+class GeminiQuotaError extends Error {
+  constructor() { super("QUOTA_EXCEEDED"); this.name = "GeminiQuotaError"; }
+}
+
 // `task` selects the server-side model + token ceiling (see supabase/functions/gemini-proxy).
 // The client cannot pick a model; passing an unknown task falls back to "generate".
 async function callGemini(prompt, systemInstruction, task = "generate") {
   const body = { task, contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7 } };
   if (systemInstruction) body.systemInstruction = { parts: [{ text: systemInstruction }] };
   const r = await fetch(GEMINI_PROXY_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (r.status === 429) throw new GeminiQuotaError();
   if (!r.ok) { const err = await r.json().catch(() => ({})); throw new Error(err.error?.message || err.error || `Gemini API error: ${r.status}`); }
   const d = await r.json();
   const cand = d.candidates?.[0];
@@ -2083,7 +2094,9 @@ function WorkflowDebugger({ theme, lang }) {
       const raw = await callGemini(`에러: ${errorMsg}\n\n워크플로우: ${debugWf.slice(0, 5000)}`, "ComfyUI troubleshooting expert. Analyze user error messages and workflow. Respond in " + sysLang + ". JSON response: {\"diagnosis\": \"cause\", \"fixes\": [\"fix 1\", \"fix 2\"], \"prevention\": \"tip\"}", "diagnose");
       setResult(parseAIJson(raw));
     } catch (err) {
-      const msg = err instanceof GeminiTruncatedError ? t("aiTooLong") : t("dbAIFail");
+      const msg = err instanceof GeminiQuotaError ? t("aiQuota")
+        : err instanceof GeminiTruncatedError ? t("aiTooLong")
+        : t("dbAIFail");
       setResult({ diagnosis: msg, fixes: [t("dbMoreDetail")], prevention: "" });
     }
     setLoading(false);
@@ -3606,7 +3619,9 @@ export default function App() {
       setStep(2);
     } catch (err) {
       setGenerating(false);
-      alert(err instanceof GeminiTruncatedError ? t("aiTooLong") : t("aiFail"));
+      alert(err instanceof GeminiQuotaError ? t("aiQuota")
+        : err instanceof GeminiTruncatedError ? t("aiTooLong")
+        : t("aiFail"));
     }
   };
 
@@ -3747,7 +3762,8 @@ ${improveCmd}`;
       setGenerating(false);
     } catch (err) {
       setGenerating(false);
-      if (err instanceof GeminiTruncatedError) alert(t("aiTooLong"));
+      if (err instanceof GeminiQuotaError) alert(t("aiQuota"));
+      else if (err instanceof GeminiTruncatedError) alert(t("aiTooLong"));
       else alert(t("impFail") + ": " + (err.message || t("impRetryMsg")));
     }
   };
