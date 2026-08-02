@@ -18,9 +18,11 @@ const prerenderRoutes = [
   "/guides/comfyui-video-guide",
   "/guides/comfyui-custom-nodes",
   "/guides/comfyui-prompt-engineering",
-  // "/showcase" is intentionally NOT prerendered: it renders user-submitted posts,
-  // which would be frozen into static HTML until the next deploy (a deleted post
-  // would keep serving) and cannot be moderated between builds.
+  // /showcase must stay here — GitHub Pages serves 404 for any path without a
+  // matching index.html, and the SPA fallback loses the route. ShowcasePage skips
+  // its post fetch during prerender (see src/lib/prerender.js), so the snapshot is
+  // an empty shell and no user content is frozen into it.
+  "/showcase",
   "/about",
   "/privacy",
   "/terms",

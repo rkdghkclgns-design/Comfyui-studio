@@ -1,16 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
+import { isPrerender } from "../lib/prerender.js";
 
 const AD_CLIENT = "ca-pub-2318294479713516";
 let scriptLoaded = false;
-
-// Prerendering runs the app in headless Chrome at build time. If ads render there,
-// the loaded <ins data-adsbygoogle-status="done"> is serialized into the static HTML —
-// the real visitor's push() then aborts ("already have ads in them") and the slot
-// earns nothing, while every build fires ad requests from a datacenter IP.
-function isPrerender() {
-  if (typeof window === "undefined") return true;
-  return Boolean(window.__PRERENDER_INJECTED) || navigator.webdriver === true;
-}
 
 function ensureAdScript() {
   if (scriptLoaded) return;

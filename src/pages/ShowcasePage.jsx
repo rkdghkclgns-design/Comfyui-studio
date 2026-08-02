@@ -3,6 +3,7 @@ import ContentLayout from "../components/ContentLayout.jsx";
 import AdUnit from "../components/AdUnit.jsx";
 import { THEMES } from "../theme.js";
 import { supabase } from "../lib/supabase.js";
+import { isPrerender } from "../lib/prerender.js";
 
 const SERIF = "'Source Serif 4','Georgia',serif";
 
@@ -47,6 +48,9 @@ export default function ShowcasePage() {
   const fetchPosts = useCallback(async () => {
     setLoading(true);
     setLoadError("");
+    // Skip during prerender so user posts are not frozen into the static HTML;
+    // the live page fetches them on hydration.
+    if (isPrerender()) { setPosts([]); setLoading(false); return; }
     const { data, error: err } = await supabase
       .from("showcase_posts")
       .select("*")
