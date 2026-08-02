@@ -40,21 +40,65 @@ create policy "showcase_posts_select_all"
   on public.showcase_posts for select
   using (true);
 
--- Logged-in users may post only as themselves. Checking user_id alone is not enough:
--- username/avatar_url are display identity, and leaving them free lets any account
--- impersonate the project's own handle on posts that carry runnable workflow JSON.
+-- Display identity is stamped server-side, never taken from the client.
+--
+-- An earlier version compared username against auth.jwt() -> 'user_metadata', but
+-- user_metadata is writable by the end user (supabase.auth.updateUser), so a poster
+-- could set their own user_name and defeat the check. auth.identities.identity_data
+-- is written by the OAuth provider at sign-in and is not client-writable, so that is
+-- the trustworthy source. This matters because posts carry runnable workflow JSON:
+-- a post impersonating the project's own handle is a credible malware vector.
+create or replace function public.showcase_posts_set_identity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_data jsonb;
+  v_avatar text;
+begin
+  select i.identity_data into v_data
+  from auth.identities i
+  where i.user_id = new.user_id and i.provider = 'github'
+  order by i.last_sign_in_at desc nulls last
+  limit 1;
+
+  new.username := left(coalesce(
+    v_data ->> 'user_name',
+    v_data ->> 'preferred_username',
+    'anonymous'
+  ), 64);
+
+  -- Avatars render in every visitor's browser; an arbitrary host would let a poster
+  -- harvest visitor IPs. Anything not from GitHub is dropped.
+  v_avatar := v_data ->> 'avatar_url';
+  new.avatar_url := case
+    when v_avatar ~ '^https://avatars\.githubusercontent\.com/' then v_avatar
+    else null
+  end;
+
+  return new;
+end;
+$$;
+
+-- Trigger functions fire regardless of EXECUTE grants; exposing this at
+-- /rest/v1/rpc/ would only widen the API surface.
+revoke execute on function public.showcase_posts_set_identity() from public;
+revoke execute on function public.showcase_posts_set_identity() from anon;
+revoke execute on function public.showcase_posts_set_identity() from authenticated;
+
+drop trigger if exists showcase_posts_identity on public.showcase_posts;
+create trigger showcase_posts_identity
+  before insert on public.showcase_posts
+  for each row execute function public.showcase_posts_set_identity();
+
+-- With the trigger owning display identity, the policy only proves ownership.
 drop policy if exists "showcase_posts_insert_own" on public.showcase_posts;
 create policy "showcase_posts_insert_own"
   on public.showcase_posts for insert
   to authenticated
-  with check (
-    auth.uid() = user_id
-    and username = coalesce(
-      auth.jwt() -> 'user_metadata' ->> 'user_name',
-      auth.jwt() -> 'user_metadata' ->> 'preferred_username',
-      'anonymous'
-    )
-  );
+  with check (auth.uid() = user_id);
 
 -- Users can delete only their own posts
 drop policy if exists "showcase_posts_delete_own" on public.showcase_posts;

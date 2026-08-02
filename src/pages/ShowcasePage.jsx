@@ -86,10 +86,10 @@ export default function ShowcasePage() {
 
     setSubmitting(true);
     setError("");
+    // username/avatar_url are stamped by a DB trigger from the OAuth identity —
+    // sending them here would be ignored, and trusting them would allow impersonation.
     const { error: insertErr } = await supabase.from("showcase_posts").insert({
       user_id: user.id,
-      username: user.user_metadata?.user_name || user.user_metadata?.preferred_username || "anonymous",
-      avatar_url: user.user_metadata?.avatar_url || null,
       title: formData.title.trim(),
       description: formData.description.trim() || null,
       workflow_json: formData.workflow_json.trim(),

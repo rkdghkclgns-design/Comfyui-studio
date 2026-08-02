@@ -3026,8 +3026,10 @@ function ShowcaseSection({ theme, lang }) {
     if (!user || !formData.title.trim() || !formData.workflow_json.trim()) { setError(isKo ? "제목과 워크플로우 JSON을 입력해주세요." : "Title and Workflow JSON required."); return; }
     try { JSON.parse(formData.workflow_json); } catch { setError(isKo ? "올바른 JSON 형식이 아닙니다." : "Invalid JSON."); return; }
     setSubmitting(true); setError("");
+    // username/avatar_url are stamped by a DB trigger from the OAuth identity —
+    // sending them here would be ignored, and trusting them would allow impersonation.
     const { error: err } = await supabase.from("showcase_posts").insert({
-      user_id: user.id, username: user.user_metadata?.user_name || "anonymous", avatar_url: user.user_metadata?.avatar_url || null,
+      user_id: user.id,
       title: formData.title.trim(), description: formData.description.trim() || null, workflow_json: formData.workflow_json.trim(), tags: formData.tags, category: formData.category || "t2i",
     });
     setSubmitting(false);
