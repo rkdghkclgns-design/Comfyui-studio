@@ -926,7 +926,16 @@ const CVM = {
   batch: { recommended: [{ name: "Juggernaut XL v9", id: "133005", base: "SDXL", vram: 8, desc: "배치 안정성 최고 — 대량 생성 시 일관된 품질", rating: 4.9, dl: "3.2M", sampler: "dpmpp_2m_sde", scheduler: "karras", steps: 30, cfg: 4.5, style: "linear-gradient(135deg,#0a1a1a,#1a3a2a,#2a1a1a)", sampleDesc: "대량 일괄 생성", img: "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/7b7b5c59-e975-4a3d-babe-b29aa577d237/width=450/7b7b5c59-e975-4a3d-babe-b29aa577d237.jpeg" }] },
 };
 
-const SAMPLERS = ["euler", "euler_ancestral", "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_3m_sde", "uni_pc", "ddim"];
+// Kept in sync with ComfyUI's KSampler sampler_name list. The AI picks from this
+// set; anything outside it was previously discarded in silence, so a valid choice
+// like "dpmpp_2m_sde_gpu" would quietly revert to the default.
+const SAMPLERS = [
+  "euler", "euler_ancestral", "heun", "dpm_2", "dpm_2_ancestral", "lms",
+  "dpmpp_2s_ancestral", "dpmpp_sde", "dpmpp_sde_gpu",
+  "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_2m_sde_gpu",
+  "dpmpp_3m_sde", "dpmpp_3m_sde_gpu",
+  "ddpm", "lcm", "uni_pc", "uni_pc_bh2", "ddim",
+];
 const SCHEDULERS = ["normal", "karras", "exponential", "sgm_uniform", "simple", "ddim_uniform", "beta"];
 const CATS = [
   { id: "t2i", label: "Text → Image", icon: "✦" }, { id: "i2i", label: "Image → Image", icon: "◐" },
@@ -3605,7 +3614,23 @@ export default function App() {
       const qaBlock = Array.isArray(qaPairs) && qaPairs.length
         ? `\nClarified via interview:\n${qaPairs.map(p => `- ${p.q} → ${p.a}`).join("\n")}`
         : "";
-      const aiRaw = await callGemini(`ComfyUI expert. User goal:"${aiInput}"${qaBlock}\nWrite "prompt" and "negPrompt" in English (Stable Diffusion prompt syntax) regardless of the user's language.\nJSON only:\n{"category":"t2i|i2i|inpaint|upscale|t2v|i2v|controlnet|lora|batch","sampler":"...","scheduler":"...","steps":25,"cfg":7,"width":1024,"height":1024,"prompt":"optimized","negPrompt":"optimized","modelBase":"SD15|SDXL|Flux|Wan|Hunyuan"}`, null, "generate");
+      // The interview only pays off if the answers move structural settings, not just
+      // the prompt text — otherwise every answer yields the same node graph.
+      const aiRaw = await callGemini(
+        `ComfyUI expert. User goal:"${aiInput}"${qaBlock}\n` +
+        `Let the answers above drive the SETTINGS, not only the prompt text:\n` +
+        `- composition: full body / portrait orientation -> 832x1216; head or bust close-up -> 896x1152; scenery or wide -> 1216x832; square only if nothing suggests otherwise\n` +
+        `- output type: video -> t2v (or i2v when a source image exists); existing image to edit -> i2i; masked area -> inpaint; enlarge only -> upscale; pose/depth/edge control -> controlnet; specific character or style model -> lora\n` +
+        `- speed vs quality: speed -> steps 15-20 and an efficient sampler; quality -> steps 30-40\n` +
+        `- illustration/anime styles tolerate higher cfg (7-9); photoreal prefers 3.5-6\n` +
+        `- modelBase: Flux for photoreal or text rendering, SDXL for general 1024px work, SD15 only when speed or low VRAM is asked for, Wan/Hunyuan for video\n` +
+        `sampler must be one of: ${SAMPLERS.join(", ")}\n` +
+        `scheduler must be one of: ${SCHEDULERS.join(", ")}\n` +
+        `Write "prompt" and "negPrompt" in English (Stable Diffusion prompt syntax) regardless of the user's language.\n` +
+        `JSON only:\n{"category":"t2i|i2i|inpaint|upscale|t2v|i2v|controlnet|lora|batch","sampler":"...","scheduler":"...","steps":25,"cfg":7,"width":1024,"height":1024,"prompt":"optimized","negPrompt":"optimized","modelBase":"SD15|SDXL|Flux|Wan|Hunyuan"}`,
+        null,
+        "generate"
+      );
       // The model's output is untrusted — clamp/whitelist before it reaches genWF.
       const safe = sanitizeAIConfig(parseAIJson(aiRaw), config);
       const newConfig = { ...config, ...safe };
@@ -3634,7 +3659,18 @@ export default function App() {
     setInterviewLoading(true);
     try {
       const raw = await callGemini(
-        `You are a ComfyUI workflow consultant. A user wants a workflow auto-generated. Before building it, interview them to clarify their purpose.\nUser goal: "${aiInput}"\nGenerate 3-4 SHORT multiple-choice questions that would most change the workflow design for THIS goal. Cover only what is genuinely ambiguous — e.g. visual style, output size/aspect ratio, quality vs speed priority, base model preference (SD15/SDXL/Flux...), whether a source/reference image exists, image vs video output. Do NOT ask about things already clear from the goal.\nWrite questions and options in ${LANG_LABELS[lang] || "English"}. Options within a question must all be distinct.\nJSON only, no markdown:\n{"questions":[{"q":"question text","options":["option1","option2","option3"],"allowCustom":true}]}`,
+        `You are a ComfyUI workflow consultant. A user wants a workflow auto-generated. Before building it, interview them to clarify their purpose.\n` +
+        `User goal: "${aiInput}"\n` +
+        `Generate 3-4 SHORT multiple-choice questions. Each question must change the WORKFLOW ITSELF — its node graph, resolution, model or step count — not merely the wording of the prompt.\n` +
+        `At least two questions must come from this list, whichever are still ambiguous for THIS goal:\n` +
+        `- still image vs video output\n` +
+        `- whether the user already has a source or reference image (decides t2i vs i2i / controlnet)\n` +
+        `- framing, which sets the aspect ratio (full body / close-up / wide scene)\n` +
+        `- speed vs quality priority (decides step count)\n` +
+        `- base model preference or VRAM limits (SD15 / SDXL / Flux)\n` +
+        `Avoid purely cosmetic questions such as mood, color or vibe — those only reshuffle prompt words. Skip anything already clear from the goal.\n` +
+        `Write questions and options in ${LANG_LABELS[lang] || "English"}. Options within a question must all be distinct.\n` +
+        `JSON only, no markdown:\n{"questions":[{"q":"question text","options":["option1","option2","option3"],"allowCustom":true}]}`,
         null,
         "interview"
       );
