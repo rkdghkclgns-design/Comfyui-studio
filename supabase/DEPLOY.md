@@ -9,6 +9,10 @@
 | Gemini 사용량 쿼터 (예산 1만원/월) | ✅ |
 | `pf_*` 13개 테이블 RLS | ✅ |
 | `verify_admin_password` anon 권한 회수 | ✅ |
+| 함수 `search_path` 고정 11건 | ✅ (advisor WARN 해소) |
+| 쇼케이스 모더레이션 수단 (`hidden_at`) | ✅ |
+| IP 30일 파기 (`pg_cron`) | ✅ |
+| 프런트엔드 배포 | ✅ |
 
 **Supabase security advisor ERROR: 13건 → 0건**
 
@@ -151,40 +155,27 @@ MCP로 접근할 수 없는 영역이라 직접 하셔야 합니다.
 > 보세요. 트리거가 `auth.identities`에서 읽으므로, GitHub OAuth가 연결되어 있지
 > 않으면 `anonymous`로 기록됩니다.
 
-### 2. 함수 search_path 고정 (advisor WARN 11건)
+### 2. 게시물 모더레이션 UI
 
-권한 제한으로 적용하지 못했습니다. SQL Editor에서 실행하세요 —
-[`migrations/20260803_pf_rls_hardening.sql`](migrations/20260803_pf_rls_hardening.sql)
-하단에 주석 처리된 11줄입니다.
-
-### 3. 프런트엔드 배포
-
-프런트엔드가 프록시 v3의 `task` 계약을 쓰도록 바뀌었습니다. 서버는 이미 v3이므로
-배포하면 즉시 맞물립니다. 배포 후:
-
-```bash
-grep -c adsbygoogle-status dist/landing/index.html
-```
-
-`0`이어야 합니다. 0이 아니면 광고가 정적 HTML에 박제된 것이라 해당 슬롯 수익이
-발생하지 않습니다.
+DB 수단(`hidden_at`)과 운영 절차는 준비돼 있지만 전용 화면이 없어 SQL Editor를
+거쳐야 합니다. 게시물이 실제로 쌓이기 시작하면(= OAuth 설정 이후) 만드는 것이
+순서에 맞습니다.
 
 ---
 
 ## 남은 과제 (이번 작업 범위 밖)
 
+- **⚠️ `dl_*` 테이블 13개가 익명 사용자에게 전면 개방** — 아래 별도 섹션 참조.
 - **프로젝트 분리**: ComfyUI Studio와 `pf_*`/`dl_*` 앱들이 DB 용량·egress·anon key·Auth
   설정을 공유합니다. RLS로 데이터 접근은 막았지만, 용량과 egress는 여전히 공유
   자원이라 한쪽의 과부하가 다른 쪽을 스로틀합니다.
-- **⚠️ `dl_*` 테이블 13개가 익명 사용자에게 전면 개방되어 있습니다** — 아래 별도 섹션 참조.
 - **구 프로젝트 데이터 이관**: 일시정지된 `pkwbqbxuujpcvndpacsc`에 기존 게시물이 있다면,
   프로젝트를 재개해 export해야 합니다. `user_id`가 `auth.users` FK라 계정 uuid가 다르면
   소유권 복원이 불가능합니다(재로그인해도 본인 글로 인식되지 않아 삭제 불가).
-- **개인정보처리방침 갱신**: 현재 AdSense와 Gemini만 고지하고 있으나, 실제로는 GitHub
-  사용자명·아바타·계정 uuid를 Supabase에 저장합니다. Supabase(처리 위탁자) 고지와
-  삭제 요청 경로가 필요합니다.
-- **App.jsx 분할**: 4,400줄 단일 파일이라 이번에 발견된 무음 고장들(공유 링크, 히스토리
-  미저장)이 오래 방치됐습니다.
+- **`pf_*` RLS 적용 후 회귀 확인**: PromForge 저장소에서 `.from("pf_` 를 grep해
+  anon key로 직접 접근하는 경로가 없는지 확인하세요. 있었다면 8/3부터 조용히 빈
+  배열을 반환하고 있을 것입니다(RLS 차단은 에러가 아니라 0행).
+- **`pg_net` 확장이 public 스키마에 설치됨** (advisor WARN).
 
 ---
 
