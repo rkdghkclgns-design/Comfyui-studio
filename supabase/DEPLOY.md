@@ -70,6 +70,68 @@ where day >= current_date - 7 order by day desc, units desc;
 
 ---
 
+## 🛠 게시물 모더레이션 (운영자용)
+
+이용약관 3.3에 명시한 삭제·노출제한 권한을 행사하는 방법입니다.
+전용 관리 화면은 아직 없으므로 **Dashboard → SQL Editor**에서 실행하세요.
+아래 쿼리는 모두 `service_role`(대시보드 기본)로 동작하며, 일반 사용자는 실행할 수 없습니다.
+
+**최근 게시물 확인**
+
+```sql
+select id, username, title, category, created_at, hidden_at
+from public.showcase_posts
+order by created_at desc limit 30;
+```
+
+**노출 제한 (되돌릴 수 있음 — 신고 검토 중 임시 조치에 권장)**
+
+```sql
+update public.showcase_posts
+set hidden_at = now(), hidden_reason = '신고 접수 — 악성 커스텀 노드 의심'
+where id = '<게시물 UUID>';
+```
+
+숨긴 글은 목록에서 사라지지만 **작성자 본인에게는 계속 보입니다.**
+"글이 통째로 사라졌다"는 오해를 막기 위한 의도적 설계입니다.
+
+**노출 제한 해제**
+
+```sql
+update public.showcase_posts set hidden_at = null, hidden_reason = null
+where id = '<게시물 UUID>';
+```
+
+**영구 삭제 (되돌릴 수 없음 — 명백한 위반에만)**
+
+```sql
+delete from public.showcase_posts where id = '<게시물 UUID>';
+```
+
+**특정 사용자의 게시물 전체 확인**
+
+```sql
+select id, title, created_at, hidden_at
+from public.showcase_posts
+where username = '<GitHub 핸들>'
+order by created_at desc;
+```
+
+> `username`은 게시 시점에 GitHub OAuth 신원에서 서버가 찍은 값입니다.
+> 클라이언트가 보낸 값이 아니므로 사칭이 아닌 실제 계정을 가리킵니다.
+> 다만 GitHub 핸들은 개명 후 타인이 재취득할 수 있으므로,
+> 동일 인물 여부는 `user_id`(계정 UUID)로 판단하세요.
+
+**현재 숨겨진 게시물 목록**
+
+```sql
+select id, username, title, hidden_at, hidden_reason
+from public.showcase_posts
+where hidden_at is not null order by hidden_at desc;
+```
+
+---
+
 ## ⏳ 남은 수동 작업
 
 ### 1. GitHub OAuth (필수 — 현재 로그인 불가)
@@ -114,9 +176,7 @@ grep -c adsbygoogle-status dist/landing/index.html
 - **프로젝트 분리**: ComfyUI Studio와 `pf_*`/`dl_*` 앱들이 DB 용량·egress·anon key·Auth
   설정을 공유합니다. RLS로 데이터 접근은 막았지만, 용량과 egress는 여전히 공유
   자원이라 한쪽의 과부하가 다른 쪽을 스로틀합니다.
-- **`dl_*` 테이블의 `using(true)` 정책**: advisor가 WARN 14건을 보고합니다. 이름이
-  `demo_*`인 것으로 보아 데모용 임시 정책 같은데, `dl_students`에 224행,
-  `dl_attendance`에 315행의 실제 데이터가 있습니다. 별도 검토가 필요합니다.
+- **⚠️ `dl_*` 테이블 13개가 익명 사용자에게 전면 개방되어 있습니다** — 아래 별도 섹션 참조.
 - **구 프로젝트 데이터 이관**: 일시정지된 `pkwbqbxuujpcvndpacsc`에 기존 게시물이 있다면,
   프로젝트를 재개해 export해야 합니다. `user_id`가 `auth.users` FK라 계정 uuid가 다르면
   소유권 복원이 불가능합니다(재로그인해도 본인 글로 인식되지 않아 삭제 불가).
@@ -125,3 +185,86 @@ grep -c adsbygoogle-status dist/landing/index.html
   삭제 요청 경로가 필요합니다.
 - **App.jsx 분할**: 4,400줄 단일 파일이라 이번에 발견된 무음 고장들(공유 링크, 히스토리
   미저장)이 오래 방치됐습니다.
+
+---
+
+## ⚠️ 미해결 — `dl_*` 테이블 익명 전면 개방 (판단 필요)
+
+### 확인된 사실
+
+`pg_policies` 조회 결과, `dl_*` 13개 테이블의 정책이 모두 동일합니다:
+
+```
+roles = {public}   cmd = ALL   qual = true   with_check = true
+```
+
+`{public}` 롤은 `anon`을 포함하고 `ALL`은 SELECT/INSERT/UPDATE/DELETE 전부입니다.
+즉 **RLS가 켜져 있지만 정책이 모든 것을 허용**하고 있어, 실질 노출은 RLS를 끈 것과 같습니다.
+
+ComfyUI Studio의 anon key는 공개 번들에 평문으로 들어갑니다(정적 SPA에서는 불가피).
+따라서 **comfyui-studio.com 방문자 누구나 아래 데이터를 읽고, 고치고, 지울 수 있습니다.**
+
+| 테이블 | 행 수 | 내용 |
+|---|---|---|
+| `dl_students` | 224 | 학생 정보 |
+| `dl_attendance` | 315 | 출결 기록 |
+| `dl_comments` | 8 | 코멘트 |
+| `dl_daily_reports` | 4 | 일일 보고 |
+| `dl_counseling` | 1 | 상담 기록 |
+| `dl_evaluations` | 1 | 평가 |
+| `dl_career_change_requests` | 0 | 진로 변경 요청 |
+| `dl_documents` | 2 | 문서 (+ `dl-documents` 버킷도 공개 목록 조회 가능) |
+
+정책 이름이 전부 `demo_*` / `dl_demo_*` 인 것으로 보아 **데모용 임시 정책이 그대로 남은 것**으로 보입니다.
+
+### `pf_*` 때와 무엇이 다른가
+
+`pf_*`는 `pf-api` 엣지 함수가 13개 테이블 전부를 `service_role`로 접근하고
+자체 인증(bcrypt + `x-pf-token`)을 쓴다는 **코드 근거**가 있어, RLS를 켜도 앱이
+멈추지 않는다고 판단할 수 있었습니다.
+
+`dl_*`는 그 근거가 없습니다. 이 프로젝트의 엣지 함수를 확인했으나 `dl_*`를 다루는
+전용 API가 없습니다. 정황상 **해당 앱이 anon key로 DB에 직접 접근**하는 클라이언트
+SPA일 가능성이 높고, 그렇다면 정책을 좁히는 순간 그 앱이 멈춥니다.
+
+**그래서 자동으로 적용하지 않았습니다.** 잘못 건드리면 운영 중인 앱과 학생 데이터
+접근이 끊깁니다.
+
+### 판단에 필요한 확인
+
+해당 앱의 코드에서 다음을 확인해 주세요.
+
+1. `createClient(...)`에 **anon key**를 쓰는지, **service_role**을 쓰는지
+2. `.from('dl_` 형태로 DB에 **직접 접근**하는지, 아니면 별도 서버/함수를 거치는지
+3. Supabase Auth로 **로그인**을 하는지 (`authenticated` 롤을 쓸 수 있는지)
+
+### 확인 결과별 조치
+
+**(A) 앱이 Supabase Auth 로그인을 사용하는 경우** — 가장 깔끔합니다.
+
+```sql
+-- 익명은 차단하고 로그인 사용자에게만 허용
+drop policy if exists "dl_demo_all_students" on public.dl_students;
+create policy "dl_students_authenticated" on public.dl_students
+  for all to authenticated using (true) with check (true);
+-- 나머지 12개 테이블도 동일 패턴
+```
+
+**(B) 앱이 로그인 없이 anon key로 직접 접근하는 경우** — 구조를 바꿔야 합니다.
+`pf-api` 같은 엣지 함수를 두어 `service_role`로 접근하게 하고, 그 뒤에 RLS를 잠급니다.
+당장의 임시 완화로는 최소한 삭제만이라도 막을 수 있습니다.
+
+```sql
+-- 익명 삭제/수정만 차단 (읽기·쓰기는 유지 — 임시 조치)
+drop policy if exists "dl_demo_all_students" on public.dl_students;
+create policy "dl_students_read"   on public.dl_students for select using (true);
+create policy "dl_students_insert" on public.dl_students for insert with check (true);
+-- UPDATE/DELETE 정책을 만들지 않는 것이 곧 차단
+```
+
+**(C) 이미 사용하지 않는 데모라면** — 데이터를 백업 후 테이블을 삭제하거나,
+정책을 모두 제거해 `service_role` 전용으로 잠그십시오.
+
+> 어느 쪽이든 **스테이징에서 먼저 확인**하고, 적용 직후 해당 앱의 주요 화면이
+> 정상 동작하는지 눈으로 확인하세요. RLS 차단은 에러가 아니라 **빈 결과**로
+> 나타나므로 화면상 "데이터 없음"으로 조용히 보입니다.
