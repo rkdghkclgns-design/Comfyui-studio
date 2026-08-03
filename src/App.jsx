@@ -28,7 +28,10 @@ function showExport(content, filename) {
 // The workflow travels inside the URL itself. A previous version stored it in
 // localStorage and handed out an id, which meant the link never resolved on the
 // recipient's machine — the share silently did nothing.
-const SHARE_URL_MAX = 30000; // keep well under browser/proxy URL limits
+// The hash never reaches a server, so proxy URL limits are irrelevant here. The real
+// ceiling is what chat apps and mail clients will carry without truncating the link —
+// a 30k-character URL "works" locally and then silently arrives broken.
+const SHARE_URL_MAX = 8000;
 
 function encodeWorkflow(wf) {
   const bytes = new TextEncoder().encode(JSON.stringify(wf));
@@ -53,11 +56,21 @@ function buildShareUrl(wf) {
   } catch { return null; }
 }
 
+// A shared link is attacker-controllable input. Without this check any decodable
+// value (`#wf=eyJhIjoxfQ` is ten characters) reached the renderer, where
+// `workflow.nodes.length` threw and unmounted the whole app — and because the hash
+// survives reloads, the page stayed blank until the URL was edited by hand.
+function isWorkflowShaped(wf) {
+  return Boolean(wf) && typeof wf === "object" && Array.isArray(wf.nodes) && Array.isArray(wf.links);
+}
+
 function loadSharedWorkflow() {
   try {
     const hash = window.location.hash || "";
     const m = hash.match(/[#&]wf=([^&]+)/);
-    return m ? decodeWorkflow(m[1]) : null;
+    if (!m) return null;
+    const wf = decodeWorkflow(m[1]);
+    return isWorkflowShaped(wf) ? wf : null;
   } catch { return null; }
 }
 
@@ -89,15 +102,26 @@ function applyWorkflowPatch(original, patch) {
     if (typeof mod.type === "string") target.type = mod.type;
   }
 
+  // The model is told to use ids above the current max, but nothing enforces it.
+  // A duplicate id makes ComfyUI reject the whole graph, so drop collisions.
+  const existingIds = new Set(wf.nodes.map(n => Number(n.id)));
   for (const node of patch.add || []) {
-    if (node && node.id != null && node.type) wf.nodes.push(node);
+    if (!node || node.id == null || !node.type) continue;
+    if (existingIds.has(Number(node.id))) continue;
+    existingIds.add(Number(node.id));
+    wf.nodes.push(node);
   }
 
   const removeLinkIds = new Set((patch.links_remove || []).map(Number).filter(Number.isFinite));
   if (removeLinkIds.size) wf.links = wf.links.filter(l => !removeLinkIds.has(Number(l[0])));
 
+  // ComfyUI links are 6-element tuples [id, from, fromSlot, to, toSlot, TYPE].
+  // A 5-element link imports as a typeless edge and breaks the graph, and an edge
+  // pointing at a node the patch just removed dangles.
   for (const link of patch.links_add || []) {
-    if (Array.isArray(link) && link.length >= 5) wf.links.push(link);
+    if (!Array.isArray(link) || link.length < 6) continue;
+    if (!existingIds.has(Number(link[1])) || !existingIds.has(Number(link[3]))) continue;
+    wf.links.push(link);
   }
 
   const maxNodeId = wf.nodes.reduce((m, n) => Math.max(m, Number(n.id) || 0), 0);
@@ -3688,10 +3712,14 @@ export default function App() {
       setAiInterview({ questions });
       setAiAnswers({});
       setInterviewLoading(false);
-    } catch {
-      // Don't leave the user staring at a spinner that silently became a workflow —
-      // tell them the interview was skipped, then generate directly.
+    } catch (err) {
       setInterviewLoading(false);
+      // Quota and truncation are not "the interview didn't work" — retrying straight
+      // into generate spends more budget and shows the user two contradictory notices.
+      if (err instanceof GeminiQuotaError) { alert(t("aiQuota")); return; }
+      if (err instanceof GeminiTruncatedError) { alert(t("aiTooLong")); return; }
+      // Otherwise: don't leave the user staring at a spinner that silently became a
+      // workflow — say the interview was skipped, then generate directly.
       setAiNotice(t("aiInterviewFallback"));
       doAIGenerate();
     }
@@ -3796,6 +3824,10 @@ ${improveCmd}`;
         analysis: result.analysis,
         changes: result.changes || [],
         improvedWf,
+        // Switching to patches fixed the truncation, but moved the failure mode from
+        // "obviously broken JSON" to "plausible graph that ComfyUI rejects". Run the
+        // same validation the generator uses so problems surface here, not there.
+        issues: validateWF(improvedWf, lang),
       });
       setGenerating(false);
     } catch (err) {
@@ -4128,6 +4160,15 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
                         </div>
                       )}
 
+                      {improveResult.issues?.length > 0 && (
+                        <div style={{ marginBottom: 14, padding: "10px 12px", background: `${T.bg3}`, border: "1px solid #e5a", borderRadius: 8 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: "#e5a", marginBottom: 6 }}>⚠ {improveResult.issues.length}</div>
+                          {improveResult.issues.slice(0, 5).map((iss, i) => (
+                            <div key={i} style={{ fontSize: 11, color: T.text2, lineHeight: 1.6 }}>· {iss.cause}</div>
+                          ))}
+                        </div>
+                      )}
+
                       {/* Before / After comparison */}
                       <div className="g-improve-cmp" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                         <div style={{ padding: "10px 12px", background: T.bg3, borderRadius: 8, border: `1px solid ${T.border}` }}>
@@ -4317,7 +4358,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:${T.border2}!i
 
           {step === 2 && workflow && (<div style={{ animation: "fi .35s ease" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
-              <div><h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 2, fontFamily: SERIF, letterSpacing: "-0.02em" }}>{t("resultTitle")}</h2><p style={{ color: T.text4, fontSize: 11 }}>{workflow.nodes.length} {t("nodes")} · {workflow.links.length} {t("impConn")} · {t("pbApplied")}</p></div>
+              <div><h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 2, fontFamily: SERIF, letterSpacing: "-0.02em" }}>{t("resultTitle")}</h2><p style={{ color: T.text4, fontSize: 11 }}>{workflow.nodes?.length ?? 0} {t("nodes")} · {workflow.links?.length ?? 0} {t("impConn")} · {t("pbApplied")}</p></div>
               <div style={{ display: "flex", gap: 5 }}>
                 <button className="bs" onClick={() => { const json = JSON.stringify(resultTab === "api" ? toAPIFormat(workflow) : workflow, null, 2); const blob = new Blob([json], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "workflow.json"; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }}>{t("resultCopy")}</button>
                 <button className="bs" onClick={() => { const url = buildShareUrl(workflow); if (url) { setShareId(true); showExport(url, "share_url.txt"); } else { alert(t("shareTooBig")); } }}>📤 {shareId ? t("rsLinked") : t("rsShare")}</button>

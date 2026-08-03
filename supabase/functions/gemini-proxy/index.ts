@@ -120,7 +120,11 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405, cors);
 
-  if (origin !== null && !ALLOWED_ORIGINS.has(origin)) {
+  // A missing Origin used to pass, which meant curl and any script skipped the check
+  // entirely — the whitelist only ever stopped cross-site calls from real browsers.
+  // Browsers always send Origin on a cross-origin POST, so requiring it costs nothing
+  // for legitimate traffic.
+  if (!origin || !ALLOWED_ORIGINS.has(origin)) {
     return json({ error: "Origin not allowed" }, 403, cors);
   }
 
@@ -188,6 +192,23 @@ Deno.serve(async (req: Request) => {
       console.error("Gemini upstream error", response.status, responseText.slice(0, 500));
       return json({ error: `Gemini API error: ${response.status}` }, response.status, cors);
     }
+
+    // Quota accounting charges each task's ceiling, which is the safe assumption but
+    // tells us nothing about real consumption. Log the actual counts so the limits can
+    // be retuned from measurement instead of guesswork.
+    try {
+      const usage = JSON.parse(responseText)?.usageMetadata;
+      if (usage) {
+        console.log(JSON.stringify({
+          evt: "gemini_usage",
+          task: taskName,
+          in: usage.promptTokenCount ?? 0,
+          out: usage.candidatesTokenCount ?? 0,
+          think: usage.thoughtsTokenCount ?? 0,
+          charged_units: task.units,
+        }));
+      }
+    } catch { /* logging must never break the response */ }
 
     return new Response(responseText, {
       headers: { ...cors, "Content-Type": "application/json" },

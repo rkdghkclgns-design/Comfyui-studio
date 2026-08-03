@@ -51,9 +51,11 @@ export default function ShowcasePage() {
     // Skip during prerender so user posts are not frozen into the static HTML;
     // the live page fetches them on hydration.
     if (isPrerender()) { setPosts([]); setLoading(false); return; }
+    // workflow_json is never shown in the list but is the largest column by far;
+    // selecting it here shipped up to ~200KB per row on every page load.
     const { data, error: err } = await supabase
       .from("showcase_posts")
-      .select("*")
+      .select("id,user_id,username,avatar_url,title,description,tags,category,created_at")
       .order("created_at", { ascending: false })
       .limit(50);
     // Ignoring the error made an outage look like an empty board.
@@ -63,6 +65,20 @@ export default function ShowcasePage() {
   }, []);
 
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
+
+  // The list no longer carries workflow_json, so fetch it for the one post being opened.
+  const openPost = useCallback(async (post) => {
+    setSelectedPost(post);
+    if (post.workflow_json !== undefined) return;
+    const { data, error: err } = await supabase
+      .from("showcase_posts")
+      .select("workflow_json")
+      .eq("id", post.id)
+      .single();
+    if (!err && data) {
+      setSelectedPost(prev => (prev && prev.id === post.id ? { ...prev, workflow_json: data.workflow_json } : prev));
+    }
+  }, []);
 
   // GitHub login
   const handleLogin = async () => {
@@ -233,15 +249,19 @@ export default function ShowcasePage() {
                   {selectedPost.tags.map(tag => <span key={tag} style={{ padding: "2px 10px", borderRadius: 20, fontSize: 11, background: `${T.accent}15`, color: T.accent, border: `1px solid ${T.accent}30` }}>{tag}</span>)}
                 </div>
               )}
-              <div style={{ position: "relative" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <span style={{ fontSize: 13, color: T.text2, fontWeight: 600 }}>Workflow JSON</span>
-                  <button onClick={() => copyJSON(selectedPost.workflow_json)} style={{ padding: "4px 12px", borderRadius: 6, border: `1px solid ${T.border}`, background: T.bg3, color: T.text2, fontSize: 12, cursor: "pointer" }}>Copy</button>
+              {selectedPost.workflow_json === undefined ? (
+                <div style={{ fontSize: 13, color: T.text2, padding: "16px 0" }}>워크플로우 불러오는 중...</div>
+              ) : (
+                <div style={{ position: "relative" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, color: T.text2, fontWeight: 600 }}>Workflow JSON</span>
+                    <button onClick={() => copyJSON(selectedPost.workflow_json)} style={{ padding: "4px 12px", borderRadius: 6, border: `1px solid ${T.border}`, background: T.bg3, color: T.text2, fontSize: 12, cursor: "pointer" }}>Copy</button>
+                  </div>
+                  <pre style={{ background: T.bg, padding: 16, borderRadius: 12, border: `1px solid ${T.border}`, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: T.text2, overflow: "auto", maxHeight: 300, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                    {selectedPost.workflow_json}
+                  </pre>
                 </div>
-                <pre style={{ background: T.bg, padding: 16, borderRadius: 12, border: `1px solid ${T.border}`, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: T.text2, overflow: "auto", maxHeight: 300, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                  {selectedPost.workflow_json}
-                </pre>
-              </div>
+              )}
               {user && user.id === selectedPost.user_id && (
                 <button onClick={() => handleDelete(selectedPost.id)} style={{ marginTop: 16, padding: "8px 16px", borderRadius: 8, border: `1px solid #e55`, background: "transparent", color: "#e55", fontSize: 12, cursor: "pointer" }}>Delete Post</button>
               )}
@@ -249,7 +269,10 @@ export default function ShowcasePage() {
           </div>
         )}
 
-        <AdUnit slot="6847008433" format="auto" />  {/* showcase-bottom */}
+        {/* Only run an ad once the page has content of its own. Serving ads next to
+            "No workflows shared yet." is a low-value-page policy issue, and it is the
+            steady state until GitHub OAuth is enabled and posting becomes possible. */}
+        {posts.length > 0 && <AdUnit slot="6847008433" format="auto" />}  {/* showcase-bottom */}
 
         {/* Posts Grid */}
         {loading ? (
@@ -267,7 +290,7 @@ export default function ShowcasePage() {
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
             {posts.map(post => (
-              <div key={post.id} onClick={() => setSelectedPost(post)} style={{
+              <div key={post.id} onClick={() => openPost(post)} style={{
                 background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 16, padding: 20, cursor: "pointer",
                 transition: "border-color 0.2s, transform 0.2s",
               }}>
