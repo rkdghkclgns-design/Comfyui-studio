@@ -1,7 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import ContentLayout from "../components/ContentLayout.jsx";
-import AdUnit from "../components/AdUnit.jsx";
 import { THEMES } from "../theme.js";
 
 const SERIF = "'Source Serif 4','Georgia',serif";
@@ -65,7 +64,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <AdUnit slot="2635599981" format="auto" />  {/* landing-bottom */}
+      {/* 광고 제거: 본문 1,378자의 소개/유도 페이지라 콘텐츠 페이지로 보기 어렵다. */}
 
       {/* How it works */}
       <section style={{ padding: "40px 0" }}>

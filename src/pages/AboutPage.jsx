@@ -1,7 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import ContentLayout from "../components/ContentLayout.jsx";
-import AdUnit from "../components/AdUnit.jsx";
 import { THEMES } from "../theme.js";
 
 const SERIF = "'Source Serif 4','Georgia',serif";
@@ -48,7 +47,8 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <AdUnit slot="5130868986" format="auto" />  {/* about-bottom */}
+        {/* 광고 제거: 본문이 775자뿐이라 AdSense "가치가 낮은 콘텐츠" 정책에 걸린다.
+            본문을 충분히 늘린 뒤에 다시 넣을 것. */}
 
         {/* Links */}
         <section style={{ marginBottom: 40 }}>

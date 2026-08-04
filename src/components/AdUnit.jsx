@@ -18,6 +18,11 @@ function ensureAdScript() {
   scriptLoaded = true;
 }
 
+// AdSense는 "콘텐츠가 없거나 가치가 낮은 화면"에 광고를 싣는 것을 금지한다.
+// 개별 페이지에서 조건을 거는 것만으로는 새 페이지를 추가할 때마다 같은 실수를
+// 반복하게 되므로, 컴포넌트 자체가 마지막 방어선이 된다.
+const MIN_BODY_CHARS = 1800;
+
 export default function AdUnit({ slot, format = "auto", style = {} }) {
   const adRef = useRef(null);
   const pushed = useRef(false);
@@ -26,7 +31,14 @@ export default function AdUnit({ slot, format = "auto", style = {} }) {
   const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
-    if (!isPrerender()) setEnabled(true);
+    if (isPrerender()) return;
+    // 하이드레이션 직후에는 본문이 아직 안 그려졌을 수 있어 한 프레임 뒤에 잰다.
+    const t = setTimeout(() => {
+      const chars = (document.body?.innerText || "").replace(/\s+/g, " ").length;
+      if (chars >= MIN_BODY_CHARS) setEnabled(true);
+      else console.warn(`AdUnit: 본문 ${chars}자로 최소 ${MIN_BODY_CHARS}자 미달 — 광고를 렌더하지 않음`);
+    }, 300);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {

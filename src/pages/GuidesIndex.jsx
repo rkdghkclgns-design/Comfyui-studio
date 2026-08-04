@@ -1,7 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import ContentLayout from "../components/ContentLayout.jsx";
-import AdUnit from "../components/AdUnit.jsx";
 import { THEMES } from "../theme.js";
 import { GUIDES } from "../content/guides.js";
 
@@ -36,7 +35,8 @@ export default function GuidesIndex() {
           ))}
         </div>
 
-        <AdUnit slot="4387665358" format="auto" />  {/* guides-index */}
+        {/* 광고 제거: 가이드 링크 목록이라 AdSense가 말하는 "이동 목적으로 사용되는
+            화면"에 해당한다. 광고는 실제 기사 본문(GuideArticle)에만 둔다. */}
 
         <div style={{ textAlign: "center", marginTop: 40, padding: "32px", background: T.bg2, borderRadius: 16, border: `1px solid ${T.border}` }}>
           <h3 style={{ fontFamily: SERIF, fontSize: 20, marginBottom: 12, color: T.text }}>지금 바로 시작하세요</h3>
