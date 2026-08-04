@@ -47,7 +47,12 @@ export default function GuideArticle() {
               <h2 style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 700, marginBottom: 16, color: T.text, paddingTop: 16 }}>{s.heading}</h2>
               <div style={{ fontSize: 15, color: T.text2, lineHeight: 1.8, whiteSpace: "pre-line" }}>{s.content}</div>
             </section>
-            {i === 0 && <AdUnit slot="8326910361" format="auto" />}  {/* guide-article-top */}
+            {/* 본문 광고는 기사가 충분히 길 때만, 그리고 첫 섹션 직후가 아니라 중간에 둔다.
+                짧은 기사에 상단 광고를 붙이면 첫 화면이 광고로 채워져 "콘텐츠보다 광고가
+                많은 화면"이 된다. */}
+            {guide.sections.length >= 6 && i === 2 && (
+              <AdUnit slot="8326910361" format="auto" />
+            )}
           </React.Fragment>
         ))}
 
